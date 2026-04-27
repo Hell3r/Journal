@@ -33,3 +33,8 @@ class AddressModel(Base):
         back_populates="address",
         cascade="all, delete-orphan"
     )
+    technician_address: Mapped[List["TechnicianModel"]] = relationship(
+        "TechnicianModel",
+        back_populates="address",
+        cascade="all, delete-orphan"
+    )

@@ -16,4 +16,3 @@ class TechnicianModel(Base):
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="technician_contractor")
     address: Mapped["AddressModel"] = relationship("AddressModel", back_populates="technician_address")
     contractor: Mapped["ContractorModel"] = relationship("ContractorModel", back_populates="technician_contractor")
-    works: Mapped["WorksModel"] = relationship("WorksModel", back_populates="technician")

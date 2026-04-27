@@ -2,7 +2,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Boolean
 from typing import List
 from src.database.database import Base
-from .associations import contractor_address_table
+from src.models.associations import contractor_address_table
 
 class ContractorModel(Base):
     __tablename__ = "contractors"
@@ -19,5 +19,9 @@ class ContractorModel(Base):
 
     technicians: Mapped[List["UserModel"]] = relationship(
         "UserModel",
+        back_populates="contractor"
+    )
+    technician_contractor: Mapped[List["TechnicianModel"]] = relationship(
+        "TechnicianModel",
         back_populates="contractor"
     )
