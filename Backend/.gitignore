@@ -147,3 +147,7 @@ docker-compose.override.yml
 /site
 
 beats/
+
+# Конфигурация Alembic и настройки БД
+alembic.ini
+src/database/database.py

@@ -1,4 +1,3 @@
-from typing_extensions import List
 from fastapi import APIRouter, HTTPException, status, Depends, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -6,24 +5,37 @@ from src.models.users import UserModel
 from src.database.deps import SessionDep
 from datetime import datetime
 from src.schemas.users import (
-    UserCreate, UserUpdate, UserPublic,
+    UserCreate, UserPublic,
     Enable2FARequest, Verify2FARequest, Disable2FARequest, TwoFactorAuthRequest
 )
 from src.services.AuthService import (
     add_to_blacklist, oauth2_scheme, create_access_token, authenticate_user,
-    get_current_user, get_user_by_username, verify_password, get_password_hash,
+    get_current_user, verify_password, get_password_hash,
     generate_totp_secret, verify_totp_code, generate_backup_codes, hash_backup_codes,
     verify_backup_code, remove_used_backup_code, create_2fa_temp_token,
     get_user_id_from_2fa_temp_token, delete_2fa_temp_token, generate_qr_base64
 )
 import logging
-from src.schemas.users import UserCreate, UserResponse, UserPublic
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/users")
 
 pending_2fa_secrets = {}
+
+
+@router.get(
+    "",
+    response_model=list[UserPublic],
+    tags=["Пользователи"],
+    summary="Получить список пользователей"
+)
+async def get_users(
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    result = await session.execute(select(UserModel).order_by(UserModel.id.asc()))
+    return list(result.scalars().all())
 
 @router.post("/login", tags = ["Авторизация"], summary = "Логин")
 async def login_user(
@@ -38,8 +50,6 @@ async def login_user(
 
     if not user.is_2fa_enabled:
         access_token = create_access_token(data={"sub": user.username})  # <-- sub = username
-        user.last_login = datetime.utcnow()
-        await session.commit()
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -86,8 +96,6 @@ async def login_2fa(
         raise HTTPException(status_code=401, detail="Неверный код")
 
     access_token = create_access_token(data={"sub": user.username})
-    user.last_login = datetime.utcnow()
-    await session.commit()
     delete_2fa_temp_token(request.temp_token)
 
     return {

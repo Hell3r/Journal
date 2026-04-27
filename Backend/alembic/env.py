@@ -5,6 +5,8 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from src.models import users, customers, curators, contractors, associations, addresses, systems_on_address, systems, types_of_works, works, technician_contractor
+
 from alembic import context
 
 # this is the Alembic Config object, which provides
