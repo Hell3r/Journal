@@ -16,13 +16,10 @@ class UserModel(Base):
     phone: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    contractor_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("contractors.id", ondelete="SET NULL")
-    )
-
-    contractor: Mapped[Optional["ContractorModel"]] = relationship(
+    contractor: Mapped[List["ContractorModel"]] = relationship(
         "ContractorModel",
-        back_populates="technicians"
+        back_populates="technicians",
+        uselist=True
     )
 
     works: Mapped[List["WorksModel"]] = relationship(
@@ -37,6 +34,10 @@ class UserModel(Base):
     technician_contractor: Mapped[List["TechnicianModel"]] = relationship(
         "TechnicianModel",
         back_populates="user"
+    )
+    contractor_engineer: Mapped[List["ContractorModel"]] = relationship(
+        "ContractorModel",
+        back_populates="engineer"
     )
 
     totp_secret: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)

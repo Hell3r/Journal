@@ -8,7 +8,6 @@ class UserBase(BaseModel):
     phone: str
     role: str
     is_active: bool = True
-    contractor_id: Optional[int] = None
 
 class UserCreate(UserBase):
     password: str
@@ -21,7 +20,6 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
-    contractor_id: Optional[int] = None
 
 class UserResponse(UserBase):
     id: int

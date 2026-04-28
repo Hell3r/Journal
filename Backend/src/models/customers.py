@@ -9,7 +9,7 @@ class CustomerModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name_of_org: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
 
     addresses: Mapped[List["AddressModel"]] = relationship(
         "AddressModel",
