@@ -16,6 +16,7 @@ from src.services.AuthService import (
     get_user_id_from_2fa_temp_token, delete_2fa_temp_token, generate_qr_base64
 )
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ pending_2fa_secrets = {}
 
 @router.get(
     "",
-    response_model=list[UserPublic],
+    response_model=List[UserPublic],
     tags=["Пользователи"],
     summary="Получить список пользователей"
 )
@@ -35,7 +36,7 @@ async def get_users(
     current_user: UserModel = Depends(get_current_user)
 ):
     result = await session.execute(select(UserModel).order_by(UserModel.id.asc()))
-    return list(result.scalars().all())
+    return result.scalars().all()
 
 @router.post("/login", tags = ["Авторизация"], summary = "Логин")
 async def login_user(
@@ -218,7 +219,6 @@ async def register_user(
         phone=user_data.phone,
         role=user_data.role,
         is_active=user_data.is_active,
-        contractor_id=user_data.contractor_id,
         password_hash=hashed_password,
         date_joined=user_data.date_joined or datetime.utcnow(),
     )

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Boolean
+from sqlalchemy import String, Boolean, ForeignKey
 from typing import List
 from src.database.database import Base
 from src.models.associations import contractor_address_table
@@ -10,6 +10,7 @@ class ContractorModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name_of_contractor: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    engineer_id: Mapped[int] = mapped_column(ForeignKey("users.id", onupdate="CASCADE", ondelete="SET NULL"))
 
     addresses: Mapped[List["AddressModel"]] = relationship(
         "AddressModel",
@@ -24,4 +25,8 @@ class ContractorModel(Base):
     technician_contractor: Mapped[List["TechnicianModel"]] = relationship(
         "TechnicianModel",
         back_populates="contractor"
+    )
+    engineer: Mapped["UserModel"] = relationship(
+        "UserModel",
+        back_populates="contractor_engineer"
     )
