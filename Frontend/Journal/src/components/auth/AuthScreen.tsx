@@ -8,6 +8,12 @@ import type {
   SessionState,
 } from '../../types/auth'
 
+function isLoginTwoFactorResponse(
+  response: LoginSuccessResponse | LoginTwoFactorResponse
+): response is LoginTwoFactorResponse {
+  return '2fa_required' in response && response['2fa_required'] === true
+}
+
 type AuthScreenProps = {
   pendingTwoFactor: PendingTwoFactorState | null
   statusMessage: string
@@ -24,7 +30,6 @@ export function AuthScreen({
   pendingTwoFactor,
   statusMessage,
   statusTone,
-  lastResponse,
   onSessionChange,
   onPendingTwoFactorChange,
   onStatusMessageChange,
@@ -57,7 +62,7 @@ export function AuthScreen({
     try {
       const response = await loginUser({ username, password }) as LoginSuccessResponse | LoginTwoFactorResponse
 
-      if ('2fa_required' in response && response['2fa_required']) {
+      if (isLoginTwoFactorResponse(response)) {
         onPendingTwoFactorChange({
           tempToken: response.temp_token,
           username,
@@ -116,43 +121,43 @@ export function AuthScreen({
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] px-4 py-4 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1600px] gap-4 lg:grid-cols-[460px_minmax(0,1fr)]">
-        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,#1a1a1a_0%,#090909_50%,#050505_100%)] p-8 shadow-[0_30px_120px_rgba(0,0,0,0.45)]">
+    <div className="min-h-screen bg-[#050505] px-2 py-2 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto grid min-h-[calc(100vh-1rem)] max-w-[1180px] items-center justify-center gap-8 lg:grid-cols-[400px_460px]">
+        <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,#1a1a1a_0%,#090909_50%,#050505_100%)] p-6 shadow-[0_30px_120px_rgba(0,0,0,0.45)] sm:p-7">
           <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
           <div className="flex h-full flex-col justify-between gap-8">
             <div className="space-y-6">
               <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.32em] text-zinc-300">
                 Электронный журнал
               </div>
-              <div className="space-y-4">
-                <h1 className="text-4xl font-semibold leading-none sm:text-5xl">Авторизация</h1>
+              <div className="space-y-3">
+                <h1 className="text-3xl font-semibold leading-none sm:text-4xl">Авторизация</h1>
                 <p className="max-w-sm text-sm leading-6 text-zinc-400">
-                  Первый экран приложения. Вход выполняется через API, а при включенной защите сразу подключается двухфакторная проверка.
+                  Электронный журнал - это веб-платформа, позволяющая организациям взаимодействовать с предприятиями, выполняющими технические проверки на её адресах. Зарегистрируйтесь или войдите как куратор, инженер или подрядчик.
                 </p>
               </div>
               <div className={`rounded-3xl border p-4 text-sm leading-6 ${statusClassName}`}>{statusMessage}</div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <FeatureCard title="JWT-сессия" text="После входа открывается основное рабочее пространство." />
-              <FeatureCard title="2FA-поток" text="Поддерживаются одноразовые и резервные коды." />
-              <FeatureCard title="Тёмный интерфейс" text="Минималистичный стиль без лишнего шума." />
-              <FeatureCard title="API-first" text="Фронт работает через бэкенд, а не напрямую с БД." />
+              <FeatureCard title="Ролевой доступ" text="После входа открывается основное ролевое рабочее пространство" />
+              <FeatureCard title="Двухфактор" text="Двухфакторная регистрация и авторизация" />
+              <FeatureCard title="Возможности кураторов" text="Подключайте предприятия с адресами к организации и назначайте инженеров" />
+              <FeatureCard title="Возможности инженеров" text="Подключайте подрядчиков различных предприятий" />
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4">
-          <div className="rounded-[30px] border border-white/10 bg-[#0b0b0c] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-8">
+        <section className="flex items-center justify-center">
+          <div className="w-full max-w-[460px] rounded-[28px] border border-white/10 bg-[#0b0b0c] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-6">
             <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-white">
+              <h2 className="text-xl font-semibold text-white sm:text-2xl">
                 {pendingTwoFactor ? 'Подтверждение входа' : 'Вход в систему'}
               </h2>
               <p className="mt-2 text-sm leading-6 text-zinc-500">
                 {pendingTwoFactor
                   ? `Для пользователя ${pendingTwoFactor.username} требуется код из приложения-аутентификатора.`
-                  : 'Введите username и пароль, чтобы открыть рабочее приложение.'}
+                  : 'Введите логин и пароль, чтобы открыть рабочее приложение.'}
               </p>
             </div>
 
@@ -160,7 +165,7 @@ export function AuthScreen({
               <form className="grid gap-4" onSubmit={handleLogin}>
                 <AuthField
                   label="Имя пользователя"
-                  placeholder="Введите username"
+                  placeholder="Введите логин"
                   value={username}
                   onChange={setUsername}
                 />
@@ -195,18 +200,6 @@ export function AuthScreen({
                 </button>
               </form>
             )}
-          </div>
-
-          <div className="rounded-[30px] border border-white/10 bg-[#0b0b0c] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-8">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Последний ответ API</h2>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">Полезно для быстрой проверки ответов во время настройки.</p>
-              </div>
-            </div>
-            <pre className="min-h-[260px] overflow-auto rounded-[24px] border border-white/10 bg-black/40 p-4 text-xs leading-6 text-zinc-300">
-              {lastResponse}
-            </pre>
           </div>
         </section>
       </div>
