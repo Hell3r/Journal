@@ -1,4 +1,6 @@
 import { apiRequest } from './api'
+import type { LoginSuccessResponse, LoginTwoFactorResponse } from '../types/auth'
+import type { UserRecord } from '../types/users'
 
 type RegisterPayload = {
   username: string
@@ -21,7 +23,7 @@ type TwoFactorPayload = {
 }
 
 export function registerUser(payload: RegisterPayload) {
-  return apiRequest('/v1/users/register', {
+  return apiRequest<UserRecord>('/v1/users/register', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -35,7 +37,7 @@ export function loginUser(payload: LoginPayload) {
   body.set('username', payload.username)
   body.set('password', payload.password)
 
-  return apiRequest('/v1/users/login', {
+  return apiRequest<LoginSuccessResponse | LoginTwoFactorResponse>('/v1/users/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -45,7 +47,7 @@ export function loginUser(payload: LoginPayload) {
 }
 
 export function verifyTwoFactorLogin(payload: TwoFactorPayload) {
-  return apiRequest('/v1/users/login/2fa', {
+  return apiRequest<LoginSuccessResponse>('/v1/users/login/2fa', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -55,14 +57,14 @@ export function verifyTwoFactorLogin(payload: TwoFactorPayload) {
 }
 
 export function logoutUser(token: string) {
-  return apiRequest('/v1/users/logout', {
+  return apiRequest<{ message: string }>('/v1/users/logout', {
     method: 'POST',
     token,
   })
 }
 
 export function enableTwoFactor(password: string, token: string) {
-  return apiRequest('/v1/users/2fa/enable', {
+  return apiRequest<{ secret: string; qr_code: string; message: string }>('/v1/users/2fa/enable', {
     method: 'POST',
     token,
     headers: {
@@ -73,7 +75,7 @@ export function enableTwoFactor(password: string, token: string) {
 }
 
 export function verifyAndActivateTwoFactor(code: string, token: string) {
-  return apiRequest('/v1/users/2fa/verify-and-activate', {
+  return apiRequest<{ message: string; backup_codes: string[]; warning: string }>('/v1/users/2fa/verify-and-activate', {
     method: 'POST',
     token,
     headers: {
@@ -84,7 +86,7 @@ export function verifyAndActivateTwoFactor(code: string, token: string) {
 }
 
 export function disableTwoFactor(code: string, token: string) {
-  return apiRequest('/v1/users/2fa/disable', {
+  return apiRequest<{ message: string }>('/v1/users/2fa/disable', {
     method: 'POST',
     token,
     headers: {

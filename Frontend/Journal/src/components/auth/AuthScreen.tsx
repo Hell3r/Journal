@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { loginUser, verifyTwoFactorLogin } from '../../services/auth'
+import { useMemo, useState, type FormEvent } from 'react'
+import { loginUser, registerUser, verifyTwoFactorLogin } from '../../services/auth'
 import type {
   AuthStatusTone,
   LoginSuccessResponse,
@@ -26,6 +26,14 @@ type AuthScreenProps = {
   onLastResponseChange: (value: string) => void
 }
 
+type AuthMode = 'login' | 'register'
+
+const roleOptions = [
+  { value: 'curator', label: 'Куратор' },
+  { value: 'engineer', label: 'Инженер' },
+  { value: 'technician', label: 'Техник' },
+]
+
 export function AuthScreen({
   pendingTwoFactor,
   statusMessage,
@@ -36,9 +44,15 @@ export function AuthScreen({
   onStatusToneChange,
   onLastResponseChange,
 }: AuthScreenProps) {
+  const [mode, setMode] = useState<AuthMode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
+  const [registerUsername, setRegisterUsername] = useState('')
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registerPhone, setRegisterPhone] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [registerRole, setRegisterRole] = useState('curator')
   const [loading, setLoading] = useState(false)
 
   const statusClassName =
@@ -48,8 +62,20 @@ export function AuthScreen({
         ? 'border-red-500/30 bg-red-500/10 text-red-100'
         : 'border-white/10 bg-white/5 text-zinc-200'
 
+  const registerHint = useMemo(() => {
+    if (registerRole === 'curator') {
+      return 'После входа можно будет отправить заявку на кураторство в нужную организацию.'
+    }
+
+    if (registerRole === 'engineer') {
+      return 'После авторизации инженерский кабинет будет ожидать назначения в подрядную организацию.'
+    }
+
+    return 'После авторизации кабинет техника будет ожидать назначения инженером на объект и систему.'
+  }, [registerRole])
+
   const handleError = (error: unknown) => {
-    const message = error instanceof Error ? error.message : 'Не удалось выполнить авторизацию.'
+    const message = error instanceof Error ? error.message : 'Не удалось выполнить запрос.'
     onStatusMessageChange(message)
     onStatusToneChange('danger')
     onLastResponseChange(message)
@@ -60,7 +86,7 @@ export function AuthScreen({
     setLoading(true)
 
     try {
-      const response = await loginUser({ username, password }) as LoginSuccessResponse | LoginTwoFactorResponse
+      const response = await loginUser({ username, password })
 
       if (isLoginTwoFactorResponse(response)) {
         onPendingTwoFactorChange({
@@ -101,7 +127,7 @@ export function AuthScreen({
       const response = await verifyTwoFactorLogin({
         temp_token: pendingTwoFactor.tempToken,
         code,
-      }) as LoginSuccessResponse
+      })
 
       onSessionChange({
         token: response.access_token,
@@ -120,86 +146,202 @@ export function AuthScreen({
     }
   }
 
+  const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setLoading(true)
+
+    try {
+      const response = await registerUser({
+        username: registerUsername,
+        email: registerEmail,
+        phone: registerPhone,
+        password: registerPassword,
+        role: registerRole,
+        is_active: true,
+        contractor_id: null,
+      })
+
+      onStatusMessageChange(
+        registerRole === 'curator'
+          ? 'Аккаунт создан. После входа отправьте заявку на кураторство в нужную организацию.'
+          : 'Аккаунт создан. После входа откроется личный кабинет по выбранной роли.'
+      )
+      onStatusToneChange('success')
+      onLastResponseChange(JSON.stringify(response, null, 2))
+      setMode('login')
+      setUsername(registerUsername)
+      setPassword(registerPassword)
+      setRegisterUsername('')
+      setRegisterEmail('')
+      setRegisterPhone('')
+      setRegisterPassword('')
+      setRegisterRole('curator')
+    } catch (error) {
+      handleError(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#050505] px-2 py-2 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-1rem)] max-w-[1180px] items-center justify-center gap-8 lg:grid-cols-[400px_460px]">
-        <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,#1a1a1a_0%,#090909_50%,#050505_100%)] p-6 shadow-[0_30px_120px_rgba(0,0,0,0.45)] sm:p-7">
+      <div className="mx-auto grid min-h-[calc(100vh-1rem)] max-w-[980px] items-center justify-center gap-3 lg:grid-cols-[340px_400px] lg:items-stretch">
+        <section className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top,#1a1a1a_0%,#090909_50%,#050505_100%)] p-4 shadow-[0_30px_120px_rgba(0,0,0,0.45)] sm:p-5 lg:h-[710px]">
           <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-          <div className="flex h-full flex-col justify-between gap-8">
-            <div className="space-y-6">
+          <div className="flex h-full flex-col justify-between gap-5">
+            <div className="space-y-4">
               <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.32em] text-zinc-300">
                 Электронный журнал
               </div>
-              <div className="space-y-3">
-                <h1 className="text-3xl font-semibold leading-none sm:text-4xl">Авторизация</h1>
-                <p className="max-w-sm text-sm leading-6 text-zinc-400">
-                  Электронный журнал - это веб-платформа, позволяющая организациям взаимодействовать с предприятиями, выполняющими технические проверки на её адресах. Зарегистрируйтесь или войдите как куратор, инженер или подрядчик.
+              <div className="space-y-2">
+                <h1 className="text-[26px] font-semibold leading-none sm:text-[30px]">Авторизация и регистрация</h1>
+                <p className="max-w-sm text-[12px] leading-5 text-zinc-400">
+                  Вход в систему выполняется через API с поддержкой двухфакторной проверки, а новые пользователи могут сразу создать аккаунт по своей роли.
                 </p>
               </div>
-              <div className={`rounded-3xl border p-4 text-sm leading-6 ${statusClassName}`}>{statusMessage}</div>
+              <div className={`rounded-[24px] border p-3 text-[12px] leading-5 ${statusClassName}`}>{statusMessage}</div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FeatureCard title="Ролевой доступ" text="После входа открывается основное ролевое рабочее пространство" />
-              <FeatureCard title="Двухфактор" text="Двухфакторная регистрация и авторизация" />
-              <FeatureCard title="Возможности кураторов" text="Подключайте предприятия с адресами к организации и назначайте инженеров" />
-              <FeatureCard title="Возможности инженеров" text="Подключайте подрядчиков различных предприятий" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <FeatureCard title="Роль куратора" text="Работа с организациями, адресами, подрядчиками и инженерами." />
+              <FeatureCard title="Роль инженера" text="Подрядные организации, объекты, техники и история работ." />
+              <FeatureCard title="Роль техника" text="Ограниченный доступ к объекту и журналу обслуживания." />
+              <FeatureCard title="2FA-поддержка" text="Подтверждение входа и управление защитой из личного кабинета." />
             </div>
           </div>
         </section>
 
-        <section className="flex items-center justify-center">
-          <div className="w-full max-w-[460px] rounded-[28px] border border-white/10 bg-[#0b0b0c] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-6">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-white sm:text-2xl">
-                {pendingTwoFactor ? 'Подтверждение входа' : 'Вход в систему'}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">
-                {pendingTwoFactor
-                  ? `Для пользователя ${pendingTwoFactor.username} требуется код из приложения-аутентификатора.`
-                  : 'Введите логин и пароль, чтобы открыть рабочее приложение.'}
-              </p>
-            </div>
-
-            {!pendingTwoFactor ? (
-              <form className="grid gap-4" onSubmit={handleLogin}>
-                <AuthField
-                  label="Имя пользователя"
-                  placeholder="Введите логин"
-                  value={username}
-                  onChange={setUsername}
-                />
-                <AuthField
-                  label="Пароль"
-                  placeholder="Введите пароль"
-                  type="password"
-                  value={password}
-                  onChange={setPassword}
-                />
-                <button className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-200">
-                  {loading ? 'Выполняется вход...' : 'Открыть приложение'}
-                </button>
-              </form>
-            ) : (
-              <form className="grid gap-4" onSubmit={handleVerifyTwoFactor}>
-                <AuthField
-                  label="Код подтверждения"
-                  placeholder="Введите одноразовый код"
-                  value={code}
-                  onChange={setCode}
-                />
-                <button className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-200">
-                  {loading ? 'Проверка кода...' : 'Подтвердить вход'}
-                </button>
+        <section className="flex h-full items-stretch justify-center">
+          <div className="flex h-full w-full max-w-[400px] flex-col overflow-hidden rounded-[26px] border border-white/10 bg-[#0b0b0c] shadow-[0_20px_70px_rgba(0,0,0,0.35)] lg:h-[710px]">
+            <div className="border-b border-white/10 p-2">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.03] p-1">
                 <button
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-                  onClick={() => onPendingTwoFactorChange(null)}
+                  className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${mode === 'login' ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/[0.04]'}`}
+                  onClick={() => setMode('login')}
                   type="button"
                 >
-                  Вернуться к логину
+                  Вход
                 </button>
-              </form>
-            )}
+                <button
+                  className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${mode === 'register' ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/[0.04]'}`}
+                  onClick={() => setMode('register')}
+                  type="button"
+                >
+                  Регистрация
+                </button>
+              </div>
+            </div>
+
+            <div className="relative flex-1 overflow-hidden p-3 sm:p-4">
+              <div className={`absolute inset-0 flex h-full flex-col overflow-y-auto p-3 transition duration-300 sm:p-4 ${mode === 'login' || pendingTwoFactor ? 'translate-x-0 opacity-100' : '-translate-x-6 opacity-0 pointer-events-none'}`}>
+                <div className="mb-3">
+                  <h2 className="text-[18px] font-semibold text-white sm:text-[20px]">
+                    {pendingTwoFactor ? 'Подтверждение входа' : 'Вход в систему'}
+                  </h2>
+                  <p className="mt-1 text-[12px] leading-5 text-zinc-500">
+                    {pendingTwoFactor
+                      ? `Для пользователя ${pendingTwoFactor.username} требуется код из приложения-аутентификатора.`
+                      : 'Введите username и пароль, чтобы открыть личный кабинет по своей роли.'}
+                  </p>
+                </div>
+
+                {!pendingTwoFactor ? (
+                  <form className="grid gap-2.5" onSubmit={handleLogin}>
+                    <AuthField label="Имя пользователя" placeholder="Введите username" value={username} onChange={setUsername} />
+                    <AuthField label="Пароль" placeholder="Введите пароль" type="password" value={password} onChange={setPassword} />
+                    <button className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-200">
+                      {loading ? 'Выполняется вход...' : 'Открыть приложение'}
+                    </button>
+                    <button
+                      className="pb-1 text-left text-[12px] text-zinc-500 transition hover:text-zinc-300"
+                      onClick={() => setMode('register')}
+                      type="button"
+                    >
+                      Нет аккаунта? зарегистрироваться
+                    </button>
+                  </form>
+                ) : (
+                  <form className="grid gap-2.5" onSubmit={handleVerifyTwoFactor}>
+                    <AuthField label="Код подтверждения" placeholder="Введите одноразовый код" value={code} onChange={setCode} />
+                    <button className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-200">
+                      {loading ? 'Проверка кода...' : 'Подтвердить вход'}
+                    </button>
+                    <button
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+                      onClick={() => onPendingTwoFactorChange(null)}
+                      type="button"
+                    >
+                      Вернуться к логину
+                    </button>
+                  </form>
+                )}
+              </div>
+
+              <div className={`absolute inset-0 flex h-full flex-col overflow-y-auto p-3 transition duration-300 sm:p-4 ${mode === 'register' && !pendingTwoFactor ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0 pointer-events-none'}`}>
+                <div className="mb-3">
+                  <h2 className="text-[18px] font-semibold text-white sm:text-[20px]">Регистрация аккаунта</h2>
+                  <p className="mt-1 text-[12px] leading-5 text-zinc-500">
+                    Создайте учётную запись и выберите роль. После входа система откроет соответствующий кабинет.
+                  </p>
+                </div>
+
+                <form className="grid gap-2.5" onSubmit={handleRegister}>
+                  <AuthField
+                    label="Имя пользователя"
+                    placeholder="Введите username или ФИО"
+                    value={registerUsername}
+                    onChange={setRegisterUsername}
+                  />
+                  <AuthField
+                    label="Email"
+                    placeholder="Введите email"
+                    type="email"
+                    value={registerEmail}
+                    onChange={setRegisterEmail}
+                  />
+                  <AuthField
+                    label="Телефон"
+                    placeholder="Введите телефон"
+                    value={registerPhone}
+                    onChange={setRegisterPhone}
+                  />
+                  <label className="grid gap-2 text-sm text-zinc-300">
+                    <span>Роль</span>
+                    <select
+                      className="h-10 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none"
+                      onChange={(event) => setRegisterRole(event.target.value)}
+                      value={registerRole}
+                    >
+                      {roleOptions.map((role) => (
+                        <option key={role.value} className="bg-zinc-950" value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <AuthField
+                    label="Пароль"
+                    placeholder="Создайте пароль"
+                    type="password"
+                    value={registerPassword}
+                    onChange={setRegisterPassword}
+                  />
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[12px] leading-5 text-zinc-400">
+                    {registerHint}
+                  </div>
+                  <button className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-200">
+                    {loading ? 'Создание аккаунта...' : 'Зарегистрироваться'}
+                  </button>
+                  <button
+                    className="pb-1 text-left text-[12px] text-zinc-500 transition hover:text-zinc-300"
+                    onClick={() => setMode('login')}
+                    type="button"
+                  >
+                    Уже есть аккаунт? войти
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -217,10 +359,10 @@ type AuthFieldProps = {
 
 function AuthField({ label, value, placeholder, onChange, type = 'text' }: AuthFieldProps) {
   return (
-    <label className="grid gap-2 text-sm text-zinc-300">
+    <label className="grid gap-1 text-sm text-zinc-300">
       <span>{label}</span>
       <input
-        className="h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/30 focus:bg-white/[0.07]"
+        className="h-10 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/30 focus:bg-white/[0.07]"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -237,9 +379,9 @@ type FeatureCardProps = {
 
 function FeatureCard({ title, text }: FeatureCardProps) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-black/25 p-4">
-      <p className="text-sm font-medium text-white">{title}</p>
-      <p className="mt-2 text-xs leading-5 text-zinc-500">{text}</p>
+    <div className="rounded-[20px] border border-white/10 bg-black/25 p-3">
+      <p className="text-[13px] font-medium text-white">{title}</p>
+      <p className="mt-1 text-[11px] leading-5 text-zinc-500">{text}</p>
     </div>
   )
 }
