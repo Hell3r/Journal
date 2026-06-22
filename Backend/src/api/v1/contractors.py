@@ -13,7 +13,7 @@ from src.models.users import UserModel
 
 router = APIRouter(prefix="/v1/contractors", tags=["Организации (Подрядчики)"])
 
-# ── CRUD подрядчиков ─────────────────────────────────────────────
+
 @router.post("/", response_model=ContractorResponse, status_code=status.HTTP_201_CREATED, summary="Создать подрядчика")
 async def create_contractor(
     data: ContractorCreate,
