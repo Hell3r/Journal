@@ -351,6 +351,12 @@ export function AppShell({
     })
 
   const quickActions = useMemo(() => {
+    const commonHealth = {
+      title: 'API',
+      text: 'Run the backend health check and update the API status indicator.',
+      actionLabel: actionState.health ? 'Checking...' : 'Check',
+      onClick: handleHealthCheck,
+    }
     const commonLast = {
       title: 'Проверка БД',
       text: 'Убедиться, что бэкенд видит подключение к PostgreSQL.',
@@ -393,6 +399,7 @@ export function AppShell({
             }
           },
         },
+        commonHealth,
         commonLast,
       ]
     }
@@ -432,6 +439,7 @@ export function AppShell({
             }
           },
         },
+        commonHealth,
         commonLast,
       ]
     }
@@ -468,6 +476,7 @@ export function AppShell({
             setRoute('technicians')
           },
         },
+        commonHealth,
         commonLast,
       ]
     }
@@ -501,6 +510,7 @@ export function AppShell({
             setRoute('profile')
           },
         },
+        commonHealth,
         commonLast,
       ]
     }
@@ -536,9 +546,10 @@ export function AppShell({
           setRoute('access')
         },
       },
+      commonHealth,
       commonLast,
     ]
-  }, [session.user.role, users.length, customers.length, addresses.length, contractors.length, curatorRequests.length, loaders, actionState.database])
+  }, [session.user.role, users.length, customers.length, addresses.length, contractors.length, curatorRequests.length, loaders, actionState.database, actionState.health])
 
   return (
     <div className="min-h-screen bg-[#050505] px-4 py-4 text-white sm:px-6 lg:px-8">

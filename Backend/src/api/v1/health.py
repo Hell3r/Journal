@@ -16,6 +16,7 @@ from src.models.works import WorksModel
 from src.models.associations import Table
 
 from starlette import status
+from src.dependencies.auth import get_current_admin_user
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ async def get_health():
             status_code= status.HTTP_200_OK)
 async def db_check(db: SessionDep):
     try:
-        result = db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         return {
             "status": "success",
             "message": "Database connection is working",
@@ -49,7 +50,7 @@ async def db_check(db: SessionDep):
 
 
 @router.post('/setup_db', tags=["Проверка Бэкенда"], summary= "Инициализация БД")
-async def setup_db():
+async def setup_db(_current_user: UserModel = Depends(get_current_admin_user)):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)

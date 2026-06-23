@@ -5,7 +5,7 @@ from src.models.users import UserModel
 from src.database.deps import SessionDep
 from datetime import datetime
 from src.schemas.users import (
-    UserCreate, UserPublic,
+    UserCreate, UserPublic, UserUpdate,
     Enable2FARequest, Verify2FARequest, Disable2FARequest, TwoFactorAuthRequest
 )
 from src.services.AuthService import (
@@ -17,6 +17,7 @@ from src.services.AuthService import (
 )
 import logging
 from typing import List
+from src.dependencies.auth import get_current_admin_user
 
 logger = logging.getLogger(__name__)
 
@@ -228,3 +229,88 @@ async def register_user(
     await session.refresh(new_user)
 
     return new_user
+
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserPublic,
+    tags=["Users"],
+    summary="Update user (admin)"
+)
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    session: SessionDep,
+    _current_user: UserModel = Depends(get_current_admin_user)
+):
+    user = await session.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = user_data.model_dump(exclude_unset=True)
+
+    if "username" in update_data and update_data["username"] != user.username:
+        existing_username = await session.execute(
+            select(UserModel).where(UserModel.username == update_data["username"], UserModel.id != user_id)
+        )
+        if existing_username.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+
+    if "email" in update_data and update_data["email"] != user.email:
+        existing_email = await session.execute(
+            select(UserModel).where(UserModel.email == update_data["email"], UserModel.id != user_id)
+        )
+        if existing_email.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+
+    password = update_data.pop("password", None)
+    if password:
+        user.password_hash = get_password_hash(password)
+
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+@router.patch(
+    "/{user_id}/activate",
+    response_model=UserPublic,
+    tags=["Users"],
+    summary="Activate user (admin)"
+)
+async def activate_user(
+    user_id: int,
+    session: SessionDep,
+    _current_user: UserModel = Depends(get_current_admin_user)
+):
+    user = await session.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_active = True
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Users"],
+    summary="Delete user (admin)"
+)
+async def delete_user(
+    user_id: int,
+    session: SessionDep,
+    _current_user: UserModel = Depends(get_current_admin_user)
+):
+    user = await session.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await session.delete(user)
+    await session.commit()
+    return None

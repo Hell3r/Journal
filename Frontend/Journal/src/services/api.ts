@@ -1,3 +1,5 @@
+import { readSessionStorage } from './sessionStorage'
+
 export const BASE_API_URL = 'http://127.0.0.1:8000'
 
 type RequestOptions = RequestInit & {
@@ -6,10 +8,11 @@ type RequestOptions = RequestInit & {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
   const { headers, token, ...rest } = options
+  const sessionToken = token ?? readSessionStorage()?.token
   const response = await fetch(`${BASE_API_URL}${path}`, {
     ...rest,
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       ...headers,
     },
   })
