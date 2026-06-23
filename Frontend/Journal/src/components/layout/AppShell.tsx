@@ -174,6 +174,11 @@ export function AppShell({
     setLoaders((current) => ({ ...current, [key]: true }))
     try {
       await action()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось загрузить данные.'
+      onStatusMessageChange(message)
+      onStatusToneChange('danger')
+      onLastResponseChange(message)
     } finally {
       setLoaders((current) => ({ ...current, [key]: false }))
     }

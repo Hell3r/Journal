@@ -1,7 +1,7 @@
 from typing import Optional
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey
+from sqlalchemy import Boolean, ForeignKey
 from src.database.database import Base
 
 class CuratorModel(Base):
@@ -10,7 +10,7 @@ class CuratorModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    is_active: Mapped[bool] = mapped_column(default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
 
     customer: Mapped["CustomerModel"] = relationship(
         "CustomerModel",

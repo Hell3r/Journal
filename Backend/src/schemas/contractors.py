@@ -1,58 +1,49 @@
 from __future__ import annotations
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
+
 
 class AddressShort(BaseModel):
     id: int
     address_name: str
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class UserShort(BaseModel):
     id: int
     email: str
-    full_name: Optional[str] = None
+    username: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class TechnicianShort(BaseModel):
     id: int
-    name: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ContractorCreate(BaseModel):
     name_of_contractor: str
-    engineer_id: Optional[int] = None   # инженер, привязанный к подрядчику
+    engineer_id: Optional[int] = None
     is_active: bool = True
+
 
 class ContractorUpdate(BaseModel):
     name_of_contractor: Optional[str] = None
     engineer_id: Optional[int] = None
     is_active: Optional[bool] = None
 
+
 class ContractorResponse(BaseModel):
     id: int
     name_of_contractor: str
     is_active: bool
     engineer_id: Optional[int] = None
-    engineer: Optional[UserShort] = None    # объект пользователя-инженера
+    engineer: Optional[UserShort] = None
     addresses: List[AddressShort] = []
     technicians: List[UserShort] = []
     technician_contractor: List[TechnicianShort] = []
 
-    @validator("technicians", pre=True)
-    def ensure_list(cls, v):
-        if v is None:
-            return []
-        if isinstance(v, list):
-            return v
-        return [v]
-
-class Config:
-        orm_mode = True
-
+    model_config = ConfigDict(from_attributes=True)

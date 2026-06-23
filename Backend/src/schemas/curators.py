@@ -1,14 +1,13 @@
 from __future__ import annotations
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+
 
 class UserShort(BaseModel):
     id: int
     email: str
 
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
 
 class CustomerShort(BaseModel):
     id: int
@@ -16,11 +15,12 @@ class CustomerShort(BaseModel):
     email: str
     is_active: bool
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class CuratorCreate(BaseModel):
     customer_id: int
+
 
 class CuratorResponse(BaseModel):
     id: int
@@ -30,5 +30,4 @@ class CuratorResponse(BaseModel):
     customer: CustomerShort
     user: UserShort
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

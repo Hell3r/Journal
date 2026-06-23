@@ -1,43 +1,42 @@
 from __future__ import annotations
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
-# Краткие схемы для вложенных объектов
+
 class ContractorShort(BaseModel):
     id: int
-    name: Optional[str] = None      # замените на реальное поле
+    name_of_contractor: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class SystemOnAddressShort(BaseModel):
     id: int
-    name: Optional[str] = None      # предположим, есть поле name
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class WorksShort(BaseModel):
     id: int
-    description: Optional[str] = None  # пример
+    description: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class TechnicianShort(BaseModel):
     id: int
-    full_name: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AddressCreate(BaseModel):
     address_name: str
     customer_id: int
 
+
 class AddressUpdate(BaseModel):
     address_name: Optional[str] = None
+
 
 class AddressResponse(BaseModel):
     id: int
@@ -46,7 +45,6 @@ class AddressResponse(BaseModel):
     contractors: List[ContractorShort] = []
     systems: List[SystemOnAddressShort] = []
     works: List[WorksShort] = []
-    technicians: List[TechnicianShort] = []     # соответствует technician_address
+    technicians: List[TechnicianShort] = Field(default_factory=list, alias="technician_address")
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

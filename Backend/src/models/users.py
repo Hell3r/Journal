@@ -19,7 +19,9 @@ class UserModel(Base):
     contractor: Mapped[List["ContractorModel"]] = relationship(
         "ContractorModel",
         back_populates="technicians",
-        uselist=True
+        secondary="technician_contractor",
+        uselist=True,
+        overlaps="technician_contractor,contractor,address,user"
     )
 
     works: Mapped[List["WorksModel"]] = relationship(
@@ -37,7 +39,8 @@ class UserModel(Base):
     )
     contractor_engineer: Mapped[List["ContractorModel"]] = relationship(
         "ContractorModel",
-        back_populates="engineer"
+        back_populates="engineer",
+        foreign_keys="ContractorModel.engineer_id"
     )
 
     totp_secret: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
