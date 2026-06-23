@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { loginUser, registerUser, verifyTwoFactorLogin } from '../../services/auth'
 import type {
   AuthStatusTone,
@@ -28,12 +28,6 @@ type AuthScreenProps = {
 
 type AuthMode = 'login' | 'register'
 
-const roleOptions = [
-  { value: 'curator', label: 'Куратор' },
-  { value: 'engineer', label: 'Инженер' },
-  { value: 'technician', label: 'Техник' },
-]
-
 export function AuthScreen({
   pendingTwoFactor,
   statusMessage,
@@ -52,7 +46,6 @@ export function AuthScreen({
   const [registerEmail, setRegisterEmail] = useState('')
   const [registerPhone, setRegisterPhone] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
-  const [registerRole, setRegisterRole] = useState('curator')
   const [loading, setLoading] = useState(false)
 
   const statusClassName =
@@ -61,18 +54,6 @@ export function AuthScreen({
       : statusTone === 'danger'
         ? 'border-red-500/30 bg-red-500/10 text-red-100'
         : 'border-white/10 bg-white/5 text-zinc-200'
-
-  const registerHint = useMemo(() => {
-    if (registerRole === 'curator') {
-      return 'После входа можно будет отправить заявку на кураторство в нужную организацию.'
-    }
-
-    if (registerRole === 'engineer') {
-      return 'После авторизации инженерский кабинет будет ожидать назначения в подрядную организацию.'
-    }
-
-    return 'После авторизации кабинет техника будет ожидать назначения инженером на объект и систему.'
-  }, [registerRole])
 
   const handleError = (error: unknown) => {
     const message = error instanceof Error ? error.message : 'Не удалось выполнить запрос.'
@@ -156,16 +137,12 @@ export function AuthScreen({
         email: registerEmail,
         phone: registerPhone,
         password: registerPassword,
-        role: registerRole,
+        role: 'user',
         is_active: true,
         contractor_id: null,
       })
 
-      onStatusMessageChange(
-        registerRole === 'curator'
-          ? 'Аккаунт создан. После входа отправьте заявку на кураторство в нужную организацию.'
-          : 'Аккаунт создан. После входа откроется личный кабинет по выбранной роли.'
-      )
+      onStatusMessageChange('Аккаунт создан. После входа откроется обычный кабинет пользователя.')
       onStatusToneChange('success')
       onLastResponseChange(JSON.stringify(response, null, 2))
       setMode('login')
@@ -175,7 +152,6 @@ export function AuthScreen({
       setRegisterEmail('')
       setRegisterPhone('')
       setRegisterPassword('')
-      setRegisterRole('curator')
     } catch (error) {
       handleError(error)
     } finally {
@@ -281,14 +257,14 @@ export function AuthScreen({
                 <div className="mb-3">
                   <h2 className="text-[18px] font-semibold text-white sm:text-[20px]">Регистрация аккаунта</h2>
                   <p className="mt-1 text-[12px] leading-5 text-zinc-500">
-                    Создайте учётную запись и выберите роль. После входа система откроет соответствующий кабинет.
+                    Создайте учётную запись для продолжения работы.
                   </p>
                 </div>
 
                 <form className="grid gap-2.5" onSubmit={handleRegister}>
                   <AuthField
                     label="Имя пользователя"
-                    placeholder="Введите username или ФИО"
+                    placeholder="Введите username"
                     value={registerUsername}
                     onChange={setRegisterUsername}
                   />
@@ -305,20 +281,7 @@ export function AuthScreen({
                     value={registerPhone}
                     onChange={setRegisterPhone}
                   />
-                  <label className="grid gap-2 text-sm text-zinc-300">
-                    <span>Роль</span>
-                    <select
-                      className="h-10 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none"
-                      onChange={(event) => setRegisterRole(event.target.value)}
-                      value={registerRole}
-                    >
-                      {roleOptions.map((role) => (
-                        <option key={role.value} className="bg-zinc-950" value={role.value}>
-                          {role.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                 
                   <AuthField
                     label="Пароль"
                     placeholder="Создайте пароль"
@@ -327,7 +290,7 @@ export function AuthScreen({
                     onChange={setRegisterPassword}
                   />
                   <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[12px] leading-5 text-zinc-400">
-                    {registerHint}
+                    При регистрации создаётся обычный пользователь. Роль назначается позже администратором.
                   </div>
                   <button className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-200">
                     {loading ? 'Создание аккаунта...' : 'Зарегистрироваться'}

@@ -70,23 +70,6 @@ class ContractorAddressService:
             return True
         return False
 
-    async def remove_address(self, contractor_id: int, address_id: int, user: UserModel) -> bool:
-        if not await self._check_curator_or_admin(user):
-            raise PermissionError("Only admin or active curator can manage contractor addresses")
-
-        contractor = await self.session.get(ContractorModel, contractor_id)
-        if not contractor:
-            raise ValueError("Contractor not found")
-        address = await self.session.get(AddressModel, address_id)
-        if not address:
-            raise ValueError("Address not found")
-
-        if address in contractor.addresses:
-            contractor.addresses.remove(address)
-            await self.session.commit()
-            return True
-        return False
-
     async def get_addresses(self, contractor_id: int) -> List[AddressModel]:
         stmt = select(ContractorModel).options(
             selectinload(ContractorModel.addresses)

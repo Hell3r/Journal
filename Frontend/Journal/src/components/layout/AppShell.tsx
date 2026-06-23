@@ -9,17 +9,49 @@ import { CuratorRequestsWorkspace } from '../workspaces/CuratorRequestsWorkspace
 import { CustomersWorkspace } from '../workspaces/CustomersWorkspace'
 import { AddressesWorkspace } from '../workspaces/AddressesWorkspace'
 import { ContractorsWorkspace } from '../workspaces/ContractorsWorkspace'
-import { checkDatabase, checkHealth } from '../../services/health'
+import { SystemsWorkspace } from '../workspaces/SystemsWorkspace'
+import { WorksWorkspace } from '../workspaces/WorksWorkspace'
+import { TechniciansWorkspace } from '../workspaces/TechniciansWorkspace'
 import { disableTwoFactor, enableTwoFactor, logoutUser, verifyAndActivateTwoFactor } from '../../services/auth'
-import { getUsers } from '../../services/users'
-import { createAddress, getAddresses } from '../../services/addresses'
-import { createContractor, getContractors } from '../../services/contractors'
+import { deleteUser, getUsers, activateUser, updateUser } from '../../services/users'
+import { createAddress, deleteAddress, getAddresses, updateAddress } from '../../services/addresses'
+import {
+  addAddressToContractor,
+  createContractor,
+  deleteContractor,
+  getContractors,
+  removeAddressFromContractor,
+  updateContractor,
+} from '../../services/contractors'
 import { createCuratorRequest, getCuratorRequests, activateCuratorRequest } from '../../services/curators'
-import { createCustomer, getCustomers } from '../../services/customers'
+import { activateCustomer, createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../../services/customers'
 import { getDefaultRouteForRole, getRoutesForRole, type AppRoute } from '../../navigation/routes'
+import {
+  addSystemToAddress,
+  createSystem,
+  createTypeOfWork,
+  deleteSystem,
+  deleteTypeOfWork,
+  getSystems,
+  getTypesOfWorks,
+  removeSystemFromAddress,
+  updateSystem,
+  updateTypeOfWork,
+} from '../../services/systems'
+import { createWork, deleteWork, getWorks } from '../../services/works'
+import { createTechnicianAssignment, deleteTechnicianAssignment, getTechnicianAssignments } from '../../services/technicianContractors'
 import type { AuthStatusTone, SessionState, TwoFactorSetupState } from '../../types/auth'
 import type { UserRecord } from '../../types/users'
-import type { AddressRecord, ContractorRecord, CuratorRequestRecord, CustomerRecord } from '../../types/domain'
+import type {
+  AddressRecord,
+  ContractorRecord,
+  CuratorRequestRecord,
+  CustomerRecord,
+  SystemRecord,
+  TypeOfWorkRecord,
+  WorkRecord,
+  TechnicianAssignmentRecord,
+} from '../../types/domain'
 
 type AppShellProps = {
   activeRoute: AppRoute
@@ -28,20 +60,15 @@ type AppShellProps = {
   statusMessage: string
   statusTone: AuthStatusTone
   lastResponse: string
-  serviceState: {
-    api: string
-    database: string
-  }
   onRouteChange: Dispatch<SetStateAction<AppRoute>>
   onSessionChange: (session: SessionState | null) => void
   onStatusMessageChange: (message: string) => void
   onStatusToneChange: (tone: AuthStatusTone) => void
   onLastResponseChange: (value: string) => void
   onTwoFactorSetupChange: (value: TwoFactorSetupState | null) => void
-  onServiceStateChange: Dispatch<SetStateAction<{ api: string; database: string }>>
 }
 
-type LoadersState = Record<'users' | 'customers' | 'addresses' | 'contractors' | 'curators', boolean>
+type LoadersState = Record<'users' | 'customers' | 'addresses' | 'contractors' | 'curators' | 'systems' | 'works' | 'technicians', boolean>
 
 const roleMeta: Record<string, { title: string; description: string }> = {
   admin: {
@@ -78,26 +105,31 @@ export function AppShell({
   statusMessage,
   statusTone,
   lastResponse,
-  serviceState,
   onRouteChange,
   onSessionChange,
   onStatusMessageChange,
   onStatusToneChange,
   onLastResponseChange,
   onTwoFactorSetupChange,
-  onServiceStateChange,
 }: AppShellProps) {
   const [users, setUsers] = useState<UserRecord[]>([])
   const [customers, setCustomers] = useState<CustomerRecord[]>([])
   const [addresses, setAddresses] = useState<AddressRecord[]>([])
   const [contractors, setContractors] = useState<ContractorRecord[]>([])
   const [curatorRequests, setCuratorRequests] = useState<CuratorRequestRecord[]>([])
+  const [systems, setSystems] = useState<SystemRecord[]>([])
+  const [typesOfWorks, setTypesOfWorks] = useState<TypeOfWorkRecord[]>([])
+  const [works, setWorks] = useState<WorkRecord[]>([])
+  const [technicianAssignments, setTechnicianAssignments] = useState<TechnicianAssignmentRecord[]>([])
   const [loaders, setLoaders] = useState<LoadersState>({
     users: false,
     customers: false,
     addresses: false,
     contractors: false,
     curators: false,
+    systems: false,
+    works: false,
+    technicians: false,
   })
   const [enablePassword, setEnablePassword] = useState('')
   const [activationCode, setActivationCode] = useState('')
@@ -136,8 +168,17 @@ export function AppShell({
     if (activeRoute === 'contractors' && contractors.length === 0) {
       void loadContractors()
     }
-    if (activeRoute === 'contractors' && users.length === 0 && (session.user.role === 'admin' || session.user.role === 'curator')) {
+    if ((activeRoute === 'contractors' || activeRoute === 'works' || activeRoute === 'technicians' || activeRoute === 'systems') && users.length === 0) {
       void loadUsers()
+    }
+    if (activeRoute === 'systems' && systems.length === 0) {
+      void loadSystems()
+    }
+    if (activeRoute === 'works' && works.length === 0) {
+      void loadWorks()
+    }
+    if (activeRoute === 'technicians' && technicianAssignments.length === 0) {
+      void loadTechnicians()
     }
     if (activeRoute === 'curator-requests' && curatorRequests.length === 0) {
       void loadCuratorRequests()
@@ -220,33 +261,43 @@ export function AppShell({
       onLastResponseChange(JSON.stringify(response, null, 2))
     })
 
+  const loadSystems = async () =>
+    withLoader('systems', async () => {
+      const [systemsResponse, typesResponse] = await Promise.all([
+        getSystems(session.token),
+        getTypesOfWorks(session.token),
+      ])
+      setSystems(systemsResponse)
+      setTypesOfWorks(typesResponse)
+      onStatusMessageChange('Справочники СПЗ и типов работ загружены.')
+      onStatusToneChange('success')
+      onLastResponseChange(JSON.stringify({ systems: systemsResponse, types: typesResponse }, null, 2))
+    })
+
+  const loadWorks = async (addressId?: number) =>
+    withLoader('works', async () => {
+      const response = await getWorks(session.token, addressId)
+      setWorks(response)
+      onStatusMessageChange('Журнал работ загружен.')
+      onStatusToneChange('success')
+      onLastResponseChange(JSON.stringify(response, null, 2))
+    })
+
+  const loadTechnicians = async () =>
+    withLoader('technicians', async () => {
+      const response = await getTechnicianAssignments(session.token)
+      setTechnicianAssignments(response)
+      onStatusMessageChange('Назначения техников загружены.')
+      onStatusToneChange('success')
+      onLastResponseChange(JSON.stringify(response, null, 2))
+    })
+
   const loadCuratorRequests = async () =>
     withLoader('curators', async () => {
       const response = await getCuratorRequests(session.token)
       setCuratorRequests(response)
       onStatusMessageChange(session.user.role === 'admin' ? 'Заявки кураторов загружены.' : 'Статус вашей заявки обновлён.')
       onStatusToneChange('success')
-      onLastResponseChange(JSON.stringify(response, null, 2))
-    })
-
-  const handleHealthCheck = () =>
-    runAction('health', async () => {
-      const response = await checkHealth()
-      onServiceStateChange((current) => ({ ...current, api: response.message ?? 'OK' }))
-      onStatusMessageChange('API отвечает корректно.')
-      onStatusToneChange('success')
-      onLastResponseChange(JSON.stringify(response, null, 2))
-    })
-
-  const handleDatabaseCheck = () =>
-    runAction('database', async () => {
-      const response = await checkDatabase()
-      onServiceStateChange((current) => ({
-        ...current,
-        database: response.status === 'success' ? 'Подключение активно' : 'Ошибка подключения',
-      }))
-      onStatusMessageChange(response.message)
-      onStatusToneChange(response.status === 'success' ? 'success' : 'danger')
       onLastResponseChange(JSON.stringify(response, null, 2))
     })
 
@@ -326,6 +377,22 @@ export function AppShell({
       onStatusToneChange('success')
     })
 
+  const handleUpdateAddress = async (addressId: number, payload: Parameters<typeof updateAddress>[1]) =>
+    runAction('updateAddress', async () => {
+      await updateAddress(addressId, payload, session.token)
+      await loadAddresses()
+      onStatusMessageChange('Адрес обновлён.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteAddress = async (addressId: number) =>
+    runAction('deleteAddress', async () => {
+      await deleteAddress(addressId, session.token)
+      await loadAddresses()
+      onStatusMessageChange('Адрес удалён.')
+      onStatusToneChange('success')
+    })
+
   const handleCreateContractor = async (payload: { name_of_contractor: string; engineer_id?: number | null }) =>
     runAction('createContractor', async () => {
       await createContractor({ ...payload, is_active: true }, session.token)
@@ -350,19 +417,152 @@ export function AppShell({
       onStatusToneChange('success')
     })
 
+  const handleUpdateUser = async (userId: number, payload: Parameters<typeof updateUser>[1]) =>
+    runAction('updateUser', async () => {
+      await updateUser(userId, payload, session.token)
+      await loadUsers()
+      onStatusMessageChange('Пользователь обновлён.')
+      onStatusToneChange('success')
+    })
+
+  const handleActivateUser = async (userId: number) =>
+    runAction('activateUser', async () => {
+      await activateUser(userId, session.token)
+      await loadUsers()
+      onStatusMessageChange('Пользователь активирован.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteUser = async (userId: number) =>
+    runAction('deleteUser', async () => {
+      await deleteUser(userId, session.token)
+      await loadUsers()
+      onStatusMessageChange('Пользователь удалён.')
+      onStatusToneChange('success')
+    })
+
+  const handleUpdateCustomer = async (customerId: number, payload: Parameters<typeof updateCustomer>[1]) =>
+    runAction('updateCustomer', async () => {
+      await updateCustomer(customerId, payload, session.token)
+      await loadCustomers()
+      onStatusMessageChange('Заказчик обновлён.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteCustomer = async (customerId: number) =>
+    runAction('deleteCustomer', async () => {
+      await deleteCustomer(customerId, session.token)
+      await loadCustomers()
+      onStatusMessageChange('Заказчик удалён.')
+      onStatusToneChange('success')
+    })
+
+  const handleActivateCustomer = async (customerId: number) =>
+    runAction('activateCustomer', async () => {
+      await activateCustomer(customerId, session.token)
+      await loadCustomers()
+      onStatusMessageChange('Заказчик активирован.')
+      onStatusToneChange('success')
+    })
+
+  const handleUpdateContractor = async (contractorId: number, payload: Parameters<typeof updateContractor>[1]) =>
+    runAction('updateContractor', async () => {
+      await updateContractor(contractorId, payload, session.token)
+      await loadContractors()
+      onStatusMessageChange('Подрядчик обновлён.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteContractor = async (contractorId: number) =>
+    runAction('deleteContractor', async () => {
+      await deleteContractor(contractorId, session.token)
+      await loadContractors()
+      onStatusMessageChange('Подрядчик удалён.')
+      onStatusToneChange('success')
+    })
+
+  const handleAddAddressToContractor = async (contractorId: number, addressId: number) =>
+    runAction('addAddressToContractor', async () => {
+      await addAddressToContractor(contractorId, addressId, session.token)
+      await Promise.all([loadContractors(), loadAddresses()])
+      onStatusMessageChange('Адрес привязан к подрядчику.')
+      onStatusToneChange('success')
+    })
+
+  const handleRemoveAddressFromContractor = async (contractorId: number, addressId: number) =>
+    runAction('removeAddressFromContractor', async () => {
+      await removeAddressFromContractor(contractorId, addressId, session.token)
+      await Promise.all([loadContractors(), loadAddresses()])
+      onStatusMessageChange('Связь адреса и подрядчика удалена.')
+      onStatusToneChange('success')
+    })
+
+  const handleUpdateSystem = async (systemId: number, payload: { name?: string }) =>
+    runAction('updateSystem', async () => {
+      await updateSystem(systemId, payload, session.token)
+      await loadSystems()
+      onStatusMessageChange('Система обновлена.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteSystem = async (systemId: number) =>
+    runAction('deleteSystem', async () => {
+      await deleteSystem(systemId, session.token)
+      await loadSystems()
+      onStatusMessageChange('Система удалена.')
+      onStatusToneChange('success')
+    })
+
+  const handleUpdateTypeOfWork = async (typeId: number, payload: { name?: string }) =>
+    runAction('updateTypeOfWork', async () => {
+      await updateTypeOfWork(typeId, payload, session.token)
+      await loadSystems()
+      onStatusMessageChange('Тип работы обновлён.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteTypeOfWork = async (typeId: number) =>
+    runAction('deleteTypeOfWork', async () => {
+      await deleteTypeOfWork(typeId, session.token)
+      await loadSystems()
+      onStatusMessageChange('Тип работы удалён.')
+      onStatusToneChange('success')
+    })
+
+  const handleCreateWork = async (payload: { address_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) =>
+    runAction('createWork', async () => {
+      await createWork(payload, session.token)
+      await Promise.all([loadWorks(), loadAddresses()])
+      onStatusMessageChange('Запись журнала добавлена.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteWork = async (workId: number) =>
+    runAction('deleteWork', async () => {
+      await deleteWork(workId, session.token)
+      await Promise.all([loadWorks(), loadAddresses()])
+      onStatusMessageChange('Запись журнала удалена.')
+      onStatusToneChange('success')
+    })
+
+  const handleCreateTechnicianAssignment = async (payload: { contractor_id: number; address_id: number; technician_id: number }) =>
+    runAction('createTechnicianAssignment', async () => {
+      await createTechnicianAssignment(payload, session.token)
+      await loadTechnicians()
+      onStatusMessageChange('Назначение техника создано.')
+      onStatusToneChange('success')
+    })
+
+  const handleDeleteTechnicianAssignment = async (assignmentId: number) =>
+    runAction('deleteTechnicianAssignment', async () => {
+      await deleteTechnicianAssignment(assignmentId, session.token)
+      await loadTechnicians()
+      onStatusMessageChange('Назначение техника удалено.')
+      onStatusToneChange('success')
+    })
+
   const quickActions = useMemo(() => {
-    const commonHealth = {
-      title: 'API',
-      text: 'Run the backend health check and update the API status indicator.',
-      actionLabel: actionState.health ? 'Checking...' : 'Check',
-      onClick: handleHealthCheck,
-    }
-    const commonLast = {
-      title: 'Проверка БД',
-      text: 'Убедиться, что бэкенд видит подключение к PostgreSQL.',
-      actionLabel: actionState.database ? 'Проверка...' : 'Проверить',
-      onClick: handleDatabaseCheck,
-    }
+
 
     if (session.user.role === 'admin') {
       return [
@@ -399,8 +599,7 @@ export function AppShell({
             }
           },
         },
-        commonHealth,
-        commonLast,
+
       ]
     }
 
@@ -439,8 +638,7 @@ export function AppShell({
             }
           },
         },
-        commonHealth,
-        commonLast,
+
       ]
     }
 
@@ -476,8 +674,7 @@ export function AppShell({
             setRoute('technicians')
           },
         },
-        commonHealth,
-        commonLast,
+
       ]
     }
 
@@ -510,8 +707,7 @@ export function AppShell({
             setRoute('profile')
           },
         },
-        commonHealth,
-        commonLast,
+
       ]
     }
 
@@ -546,8 +742,7 @@ export function AppShell({
           setRoute('access')
         },
       },
-      commonHealth,
-      commonLast,
+
     ]
   }, [session.user.role, users.length, customers.length, addresses.length, contractors.length, curatorRequests.length, loaders, actionState.database, actionState.health])
 
@@ -583,7 +778,6 @@ export function AppShell({
                 ...action,
                 onClick: () => void action.onClick(),
               }))}
-              serviceState={serviceState}
               twoFactorLabel={session.twoFactorEnabled ? 'Включена' : 'Выключена'}
               usersCountLabel={session.user.role === 'admin' ? String(users.length || 0) : roleInfo.title}
             />
@@ -599,7 +793,15 @@ export function AppShell({
 
           {activeRoute === 'users' &&
             (session.user.role === 'admin' ? (
-              <UsersRegistry loading={loaders.users} onReload={() => void loadUsers()} users={users} />
+              <UsersRegistry
+                canManage
+                loading={loaders.users}
+                onActivate={handleActivateUser}
+                onDelete={handleDeleteUser}
+                onReload={() => void loadUsers()}
+                onUpdate={handleUpdateUser}
+                users={users}
+              />
             ) : (
               <ModulePlaceholder
                 title="Реестр пользователей"
@@ -623,10 +825,13 @@ export function AppShell({
 
           {activeRoute === 'customers' && (
             <CustomersWorkspace
-              canCreate={session.user.role === 'admin'}
+              canManage={session.user.role === 'admin' || session.user.role === 'curator'}
               customers={customers}
               loading={loaders.customers}
               onCreate={handleCreateCustomer}
+              onActivate={handleActivateCustomer}
+              onDelete={handleDeleteCustomer}
+              onUpdate={handleUpdateCustomer}
               onReload={() => void loadCustomers()}
             />
           )}
@@ -634,11 +839,51 @@ export function AppShell({
           {activeRoute === 'addresses' && (
             <AddressesWorkspace
               addresses={addresses}
-              canCreate={session.user.role === 'admin' || session.user.role === 'curator'}
+              canManage={session.user.role === 'admin' || session.user.role === 'curator'}
               customers={customers}
+              systems={systems}
+              typesOfWorks={typesOfWorks}
+              technicians={users}
               loading={loaders.addresses}
               onCreate={handleCreateAddress}
+              onDelete={handleDeleteAddress}
+              onUpdate={handleUpdateAddress}
+              onAddSystemToAddress={async (addressId, systemId) => {
+                await addSystemToAddress(systemId, addressId, session.token)
+                await loadSystems()
+                await loadAddresses()
+              }}
+              onRemoveSystemFromAddress={async (addressId, systemId) => {
+                await removeSystemFromAddress(systemId, addressId, session.token)
+                await loadSystems()
+                await loadAddresses()
+              }}
+              onCreateWork={handleCreateWork}
+              onDeleteWork={handleDeleteWork}
               onReload={(customerId?: number) => void loadAddresses(customerId)}
+              onReloadCustomers={() => void loadCustomers()}
+            />
+          )}
+
+          {activeRoute === 'systems' && (
+            <SystemsWorkspace
+              canManage={session.user.role === 'admin'}
+              loading={loaders.systems}
+              onCreateSystem={async (payload) => {
+                await createSystem(payload, session.token)
+                await loadSystems()
+              }}
+              onCreateTypeOfWork={async (payload) => {
+                await createTypeOfWork(payload, session.token)
+                await loadSystems()
+              }}
+              onDeleteSystem={handleDeleteSystem}
+              onDeleteTypeOfWork={handleDeleteTypeOfWork}
+              onReload={() => void loadSystems()}
+              onUpdateSystem={handleUpdateSystem}
+              onUpdateTypeOfWork={handleUpdateTypeOfWork}
+              systems={systems}
+              typesOfWorks={typesOfWorks}
             />
           )}
 
@@ -649,31 +894,40 @@ export function AppShell({
               engineers={engineers}
               loading={loaders.contractors}
               onCreate={handleCreateContractor}
+              onAddAddress={handleAddAddressToContractor}
+              onRemoveAddress={handleRemoveAddressFromContractor}
+              onDelete={handleDeleteContractor}
+              onUpdate={handleUpdateContractor}
+              addresses={addresses}
               onReload={() => void loadContractors()}
             />
           )}
 
           {activeRoute === 'works' && (
-            <ModulePlaceholder
-              title="Работы и журнал обслуживания"
-              subtitle="Зона под журнал эксплуатации, последние работы, акты ТО и замечания по системам. Для этой части в текущем API ещё не хватает отдельных рабочих endpoint’ов."
-              items={[
-                'Последние работы по объектам',
-                'Журнал обслуживания по системам',
-                'Замечания и неисправности',
-              ]}
+            <WorksWorkspace
+              canManage={session.user.role === 'admin' || session.user.role === 'curator' || session.user.role === 'engineer'}
+              addresses={addresses}
+              loading={loaders.works}
+              onCreate={handleCreateWork}
+              onDelete={handleDeleteWork}
+              onReload={(addressId?: number) => void loadWorks(addressId)}
+              systems={systems}
+              technicians={users}
+              typesOfWorks={typesOfWorks}
+              works={works}
             />
           )}
 
           {activeRoute === 'technicians' && (
-            <ModulePlaceholder
-              title="Техники"
-              subtitle="Инженерский раздел для просмотра и назначения техников. На модели связи уже есть база, но отдельный API для управления техниками пока не открыт."
-              items={[
-                'Просмотр назначенных техников',
-                'Привязка техника к подрядчику',
-                'Привязка техника к объекту и системе',
-              ]}
+            <TechniciansWorkspace
+              canManage={session.user.role === 'admin' || session.user.role === 'curator' || session.user.role === 'engineer'}
+              assignments={technicianAssignments}
+              contractors={contractors}
+              loading={loaders.technicians}
+              onCreate={handleCreateTechnicianAssignment}
+              onDelete={handleDeleteTechnicianAssignment}
+              onReload={() => void loadTechnicians()}
+              technicians={users}
             />
           )}
 

@@ -1,30 +1,57 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { CustomerRecord } from '../../types/domain'
 
 type CustomersWorkspaceProps = {
-  canCreate: boolean
+  canManage: boolean
   customers: CustomerRecord[]
   loading: boolean
   onCreate: (payload: { name_of_org: string; email: string }) => Promise<void>
+  onUpdate: (customerId: number, payload: { name_of_org?: string; email?: string }) => Promise<void>
+  onDelete: (customerId: number) => Promise<void>
+  onActivate: (customerId: number) => Promise<void>
   onReload: () => void
 }
 
 export function CustomersWorkspace({
-  canCreate,
+  canManage,
   customers,
   loading,
   onCreate,
+  onUpdate,
+  onDelete,
+  onActivate,
   onReload,
 }: CustomersWorkspaceProps) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null)
+
+  const selectedCustomer = useMemo(
+    () => customers.find((item) => item.id === selectedCustomerId) ?? null,
+    [customers, selectedCustomerId]
+  )
+
+  useEffect(() => {
+    if (!selectedCustomerId && customers.length > 0) {
+      setSelectedCustomerId(customers[0].id)
+      setName(customers[0].name_of_org)
+      setEmail(customers[0].email)
+    }
+  }, [customers, selectedCustomerId])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    await onCreate({
-      name_of_org: name,
-      email,
-    })
+    if (selectedCustomer) {
+      await onUpdate(selectedCustomer.id, {
+        name_of_org: name,
+        email,
+      })
+    } else {
+      await onCreate({
+        name_of_org: name,
+        email,
+      })
+    }
     setName('')
     setEmail('')
   }
@@ -50,7 +77,20 @@ export function CustomersWorkspace({
 
         <div className="mt-6 grid gap-3">
           {customers.map((customer) => (
-            <div key={customer.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <button
+              key={customer.id}
+              className={`rounded-[24px] border p-4 text-left transition ${
+                selectedCustomerId === customer.id
+                  ? 'border-white/20 bg-white/10'
+                  : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.05]'
+              }`}
+              onClick={() => {
+                setSelectedCustomerId(customer.id)
+                setName(customer.name_of_org)
+                setEmail(customer.email)
+              }}
+              type="button"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-white">{customer.name_of_org}</p>
@@ -64,27 +104,54 @@ export function CustomersWorkspace({
                 <div>Адресов: {customer.addresses.length}</div>
                 <div>Кураторов: {customer.curators.length}</div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="rounded-[30px] border border-white/10 bg-[#0b0b0c] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-8">
-        <h3 className="text-2xl font-semibold text-white">Добавление заказчика</h3>
+        <h3 className="text-2xl font-semibold text-white">Управление заказчиком</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          {canCreate ? 'Создание новой организации через API.' : 'Для текущей роли доступен просмотр без создания новых организаций.'}
+          {canManage ? 'Редактирование, активация и удаление доступны администратору.' : 'Только просмотр списка организаций.'}
         </p>
-        {canCreate ? (
+        {canManage ? (
           <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
             <Field label="Название организации" value={name} onChange={setName} placeholder="Введите наименование" />
             <Field label="Email" value={email} onChange={setEmail} placeholder="Введите email" type="email" />
-            <button className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-200">
-              Добавить организацию
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-200">
+                {selectedCustomer ? 'Сохранить' : 'Добавить'}
+              </button>
+              {selectedCustomer && (
+                <>
+                  <button
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+                    onClick={async () => {
+                      await onActivate(selectedCustomer.id)
+                    }}
+                    type="button"
+                  >
+                    Активировать
+                  </button>
+                  <button
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+                    onClick={async () => {
+                      await onDelete(selectedCustomer.id)
+                      setSelectedCustomerId(null)
+                      setName('')
+                      setEmail('')
+                    }}
+                    type="button"
+                  >
+                    Удалить
+                  </button>
+                </>
+              )}
+            </div>
           </form>
         ) : (
           <div className="mt-6 rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm text-zinc-500">
-            Создание организаций доступно из кабинета администратора.
+            Создание и редактирование организаций доступно администратору.
           </div>
         )}
       </div>

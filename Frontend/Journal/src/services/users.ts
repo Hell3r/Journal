@@ -17,6 +17,20 @@ export function getUsers(token?: string) {
   })
 }
 
+export function getUser(userId: number, token?: string) {
+  return apiRequest<UserRecord>(`/v1/users/${userId}`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export function getCurrentUser(token?: string) {
+  return apiRequest<UserRecord>('/v1/users/me', {
+    method: 'GET',
+    token,
+  })
+}
+
 export function updateUser(userId: number, payload: UserUpdatePayload, token?: string) {
   return apiRequest<UserRecord>(`/v1/users/${userId}`, {
     method: 'PATCH',

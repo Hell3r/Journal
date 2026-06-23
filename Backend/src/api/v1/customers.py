@@ -18,7 +18,10 @@ async def create_customer(
     current_user: UserModel = Depends(get_current_user)
 ):
     service = CustomerService(session)
-    customer = await service.create(data)
+    try:
+        customer = await service.create(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return customer
 
 @router.get("/", response_model=List[CustomerResponse], summary= "Получить всех заказчиков")
@@ -52,7 +55,10 @@ async def update_customer(
     current_user: UserModel = Depends(get_current_user)
 ):
     service = CustomerService(session)
-    customer = await service.update(customer_id, data)
+    try:
+        customer = await service.update(customer_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     return customer

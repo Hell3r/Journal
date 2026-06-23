@@ -48,7 +48,7 @@ class ContractorService:
             if not user_exists:
                 raise ValueError("Engineer user not found")
 
-        contractor = ContractorModel(**data.dict())
+        contractor = ContractorModel(**data.model_dump())
         self.session.add(contractor)
         await self.session.commit()
         # Получаем объект с eager load
@@ -77,7 +77,7 @@ class ContractorService:
         if not contractor:
             return None
 
-        update_data = data.dict(exclude_unset=True)
+        update_data = data.model_dump(exclude_unset=True)
 
         # Если меняют engineer_id, проверим существование
         if "engineer_id" in update_data and update_data["engineer_id"] is not None:

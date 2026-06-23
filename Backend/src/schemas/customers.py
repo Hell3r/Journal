@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import List, Optional
 
 
@@ -32,7 +32,7 @@ class CustomerResponse(BaseModel):
     name_of_org: str
     email: str
     is_active: bool
-    addresses: List[AddressBase] = []
-    curators: List[CuratorBase] = []
+    addresses: List[AddressBase] = Field(default_factory=list)
+    curators: List[CuratorBase] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

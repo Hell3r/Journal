@@ -42,8 +42,8 @@ class ContractorResponse(BaseModel):
     is_active: bool
     engineer_id: Optional[int] = None
     engineer: Optional[UserShort] = None
-    addresses: List[AddressShort] = []
-    technicians: List[UserShort] = []
-    technician_contractor: List[TechnicianShort] = []
+    addresses: List[AddressShort] = Field(default_factory=list)
+    technicians: List[UserShort] = Field(default_factory=list)
+    technician_contractor: List[TechnicianShort] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

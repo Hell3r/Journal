@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.addresses import AddressModel
 from src.models.curators import CuratorModel
+from src.models.systems_on_address import SystemOnAddressModel
+from src.models.works import WorksModel
 from src.models.users import UserModel
 from src.schemas.addresses import AddressCreate, AddressUpdate
 
@@ -13,11 +15,12 @@ class AddressService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def _get_with_eager(self, stmt):
+    def _get_with_eager(self, stmt):
         return stmt.options(
             selectinload(AddressModel.contractors),
-            selectinload(AddressModel.systems),
-            selectinload(AddressModel.works),
+            selectinload(AddressModel.systems).selectinload(SystemOnAddressModel.system),
+            selectinload(AddressModel.works).selectinload(WorksModel.type_of_work),
+            selectinload(AddressModel.works).selectinload(WorksModel.technician),
             selectinload(AddressModel.technician_address)   # relationship имя technician_address
         )
 
@@ -38,18 +41,18 @@ class AddressService:
         if not await self._check_curator_access(user, data.customer_id):
             raise PermissionError("Only active curator of this organisation or admin can create address")
 
-        address = AddressModel(**data.dict())
+        address = AddressModel(**data.model_dump())
         self.session.add(address)
         await self.session.commit()
         # Загружаем связи для ответа
         stmt = select(AddressModel).where(AddressModel.id == address.id)
-        stmt = await self._get_with_eager(stmt)
+        stmt = self._get_with_eager(stmt)
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
     async def get_by_id(self, address_id: int) -> Optional[AddressModel]:
         stmt = select(AddressModel).where(AddressModel.id == address_id)
-        stmt = await self._get_with_eager(stmt)
+        stmt = self._get_with_eager(stmt)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -58,7 +61,7 @@ class AddressService:
         stmt = select(AddressModel)
         if customer_id is not None:
             stmt = stmt.where(AddressModel.customer_id == customer_id)
-        stmt = await self._get_with_eager(stmt)
+        stmt = self._get_with_eager(stmt)
         stmt = stmt.offset(skip).limit(limit).order_by(AddressModel.id)
         result = await self.session.execute(stmt)
         return result.scalars().all()
@@ -70,7 +73,7 @@ class AddressService:
         if not await self._check_curator_access(user, address.customer_id):
             raise PermissionError("Only active curator of this organisation or admin can update address")
 
-        for field, value in data.dict(exclude_unset=True).items():
+        for field, value in data.model_dump(exclude_unset=True).items():
             setattr(address, field, value)
         await self.session.commit()
         # Перезагружаем с eager load

@@ -1,12 +1,16 @@
 from __future__ import annotations
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.deps import SessionDep
 from src.schemas.addresses import AddressCreate, AddressUpdate, AddressResponse
 from src.services.AddressService import AddressService
+from src.services.SystemsService import SystemsService
+from src.services.WorksService import WorksService
+from src.schemas.systems import SystemOnAddressResponse
+from src.schemas.works import WorkResponse, WorkCreateForAddress, WorkCreate
 from src.dependencies.auth import get_current_user
+from src.dependencies.auth import get_current_admin_user
 from src.models.users import UserModel
 
 router = APIRouter(prefix="/v1/addresses", tags=["Адреса"])
@@ -68,7 +72,7 @@ async def update_address(
 async def delete_address(
     address_id: int,
     session: SessionDep,
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_admin_user)
 ):
     service = AddressService(session)
     try:
@@ -77,3 +81,83 @@ async def delete_address(
         raise HTTPException(status_code=403, detail=str(e))
     if not deleted:
         raise HTTPException(status_code=404, detail="Address not found")
+    return None
+
+
+@router.get("/{address_id}/systems", response_model=List[SystemOnAddressResponse], summary="Получить системы на адресе")
+async def list_systems_of_address(
+    address_id: int,
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    service = SystemsService(session)
+    try:
+        return await service.list_relations_for_address(address_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{address_id}/systems/{system_id}", response_model=SystemOnAddressResponse, status_code=status.HTTP_201_CREATED, summary="Добавить систему на адрес")
+async def add_system_to_address(
+    address_id: int,
+    system_id: int,
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    service = SystemsService(session)
+    try:
+        relation = await service.add_to_address(system_id=system_id, address_id=address_id, user=current_user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if not relation:
+        raise HTTPException(status_code=409, detail="System already assigned to this address")
+    return relation
+
+
+@router.delete("/{address_id}/systems/{system_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить систему с адреса")
+async def remove_system_from_address(
+    address_id: int,
+    system_id: int,
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    service = SystemsService(session)
+    try:
+        removed = await service.remove_from_address(system_id=system_id, address_id=address_id, user=current_user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if not removed:
+        raise HTTPException(status_code=404, detail="System was not assigned to this address")
+    return None
+
+
+@router.get("/{address_id}/works", response_model=List[WorkResponse], summary="Получить работы на адресе")
+async def list_works_of_address(
+    address_id: int,
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    service = WorksService(session)
+    return await service.get_all(address_id=address_id)
+
+
+@router.post("/{address_id}/works", response_model=WorkResponse, status_code=status.HTTP_201_CREATED, summary="Создать работу на адресе")
+async def create_work_for_address(
+    address_id: int,
+    data: WorkCreateForAddress,
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    service = WorksService(session)
+    try:
+        payload = WorkCreate(address_id=address_id, **data.model_dump())
+        work = await service.create(payload, current_user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return work

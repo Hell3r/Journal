@@ -14,10 +14,6 @@ function App() {
   const [statusMessage, setStatusMessage] = useState(defaultStatusMessage)
   const [statusTone, setStatusTone] = useState<AuthStatusTone>('neutral')
   const [lastResponse, setLastResponse] = useState('Ожидается первое действие.')
-  const [serviceState, setServiceState] = useState({
-    api: 'Не проверено',
-    database: 'Не проверено',
-  })
   const [activeRoute, setActiveRoute] = useState<AppRoute>(() => {
     const storedSession = readSessionStorage()
     const fallback = getDefaultRouteForRole(storedSession?.user.role ?? 'user')
@@ -51,10 +47,6 @@ function App() {
     createSessionStorage(null)
     setPendingTwoFactor(null)
     setTwoFactorSetup(null)
-    setServiceState({
-      api: 'Не проверено',
-      database: 'Не проверено',
-    })
     const fallback = getDefaultRouteForRole('user')
     setActiveRoute(fallback)
     window.location.hash = fallback
@@ -66,12 +58,10 @@ function App() {
       lastResponse={lastResponse}
       onLastResponseChange={setLastResponse}
       onRouteChange={setActiveRoute}
-      onServiceStateChange={setServiceState}
       onSessionChange={setSession}
       onStatusMessageChange={setStatusMessage}
       onStatusToneChange={setStatusTone}
       onTwoFactorSetupChange={setTwoFactorSetup}
-      serviceState={serviceState}
       session={session}
       statusMessage={statusMessage}
       statusTone={statusTone}

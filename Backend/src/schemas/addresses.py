@@ -10,8 +10,33 @@ class ContractorShort(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SystemShort(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SystemOnAddressShort(BaseModel):
     id: int
+    address_id: int
+    system_id: int
+    system: Optional[SystemShort] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TypeOfWorkShort(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserShort(BaseModel):
+    id: int
+    email: str
+    username: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -19,6 +44,11 @@ class SystemOnAddressShort(BaseModel):
 class WorksShort(BaseModel):
     id: int
     description: Optional[str] = None
+    address_id: int
+    type_of_work_id: int
+    technician_id: int
+    type_of_work: Optional[TypeOfWorkShort] = None
+    technician: Optional[UserShort] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,9 +72,9 @@ class AddressResponse(BaseModel):
     id: int
     customer_id: int
     address_name: str
-    contractors: List[ContractorShort] = []
-    systems: List[SystemOnAddressShort] = []
-    works: List[WorksShort] = []
+    contractors: List[ContractorShort] = Field(default_factory=list)
+    systems: List[SystemOnAddressShort] = Field(default_factory=list)
+    works: List[WorksShort] = Field(default_factory=list)
     technicians: List[TechnicianShort] = Field(default_factory=list, alias="technician_address")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

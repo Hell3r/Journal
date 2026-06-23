@@ -18,6 +18,7 @@ from src.services.AuthService import (
 import logging
 from typing import List
 from src.dependencies.auth import get_current_admin_user
+from src.services.UserService import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,38 @@ async def get_users(
     session: SessionDep,
     current_user: UserModel = Depends(get_current_user)
 ):
-    result = await session.execute(select(UserModel).order_by(UserModel.id.asc()))
-    return result.scalars().all()
+    service = UserService(session)
+    return await service.get_all()
+
+
+@router.get(
+    "/me",
+    response_model=UserPublic,
+    tags=["Пользователи"],
+    summary="Получить текущего пользователя"
+)
+async def get_current_profile(
+    current_user: UserModel = Depends(get_current_user)
+):
+    return current_user
+
+
+@router.get(
+    "/{user_id}",
+    response_model=UserPublic,
+    tags=["Пользователи"],
+    summary="Получить пользователя по идентификатору"
+)
+async def get_user_by_id(
+    user_id: int,
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_admin_user)
+):
+    service = UserService(session)
+    user = await service.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 @router.post("/login", tags = ["Авторизация"], summary = "Логин")
 async def login_user(
@@ -194,41 +225,12 @@ async def register_user(
         user_data: UserCreate,
         session: SessionDep
 ):
-    existing_username = await session.execute(
-        select(UserModel).where(UserModel.username == user_data.username)
-    )
-    if existing_username.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Пользователь с таким username уже существует"
-        )
-
-    existing_email = await session.execute(
-        select(UserModel).where(UserModel.email == user_data.email)
-    )
-    if existing_email.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Пользователь с таким email уже существует"
-        )
-
-    hashed_password = get_password_hash(user_data.password)
-
-    new_user = UserModel(
-        username=user_data.username,
-        email=user_data.email,
-        phone=user_data.phone,
-        role=user_data.role,
-        is_active=user_data.is_active,
-        password_hash=hashed_password,
-        date_joined=user_data.date_joined or datetime.utcnow(),
-    )
-
-    session.add(new_user)
-    await session.commit()
-    await session.refresh(new_user)
-
-    return new_user
+    service = UserService(session)
+    try:
+        user_data.role = "user"
+        return await service.create(user_data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.patch(
@@ -243,35 +245,13 @@ async def update_user(
     session: SessionDep,
     _current_user: UserModel = Depends(get_current_admin_user)
 ):
-    user = await session.get(UserModel, user_id)
+    service = UserService(session)
+    try:
+        user = await service.update(user_id, user_data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    update_data = user_data.model_dump(exclude_unset=True)
-
-    if "username" in update_data and update_data["username"] != user.username:
-        existing_username = await session.execute(
-            select(UserModel).where(UserModel.username == update_data["username"], UserModel.id != user_id)
-        )
-        if existing_username.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
-
-    if "email" in update_data and update_data["email"] != user.email:
-        existing_email = await session.execute(
-            select(UserModel).where(UserModel.email == update_data["email"], UserModel.id != user_id)
-        )
-        if existing_email.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
-
-    password = update_data.pop("password", None)
-    if password:
-        user.password_hash = get_password_hash(password)
-
-    for field, value in update_data.items():
-        setattr(user, field, value)
-
-    await session.commit()
-    await session.refresh(user)
     return user
 
 
@@ -286,13 +266,10 @@ async def activate_user(
     session: SessionDep,
     _current_user: UserModel = Depends(get_current_admin_user)
 ):
-    user = await session.get(UserModel, user_id)
+    service = UserService(session)
+    user = await service.activate(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    user.is_active = True
-    await session.commit()
-    await session.refresh(user)
     return user
 
 
@@ -307,10 +284,8 @@ async def delete_user(
     session: SessionDep,
     _current_user: UserModel = Depends(get_current_admin_user)
 ):
-    user = await session.get(UserModel, user_id)
-    if not user:
+    service = UserService(session)
+    deleted = await service.delete(user_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
-
-    await session.delete(user)
-    await session.commit()
     return None

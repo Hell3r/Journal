@@ -82,6 +82,7 @@ async def delete_contractor(
         raise HTTPException(status_code=403, detail=str(e))
     if not deleted:
         raise HTTPException(status_code=404, detail="Contractor not found")
+    return None
 
 
 # ── Управление адресами подрядчика внутри того же роутера ────────

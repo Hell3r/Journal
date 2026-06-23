@@ -20,19 +20,43 @@ export type AddressRecord = {
   address_name: string
   contractors: Array<{
     id: number
-    name?: string | null
+    name_of_contractor?: string | null
   }>
   systems: Array<{
     id: number
-    name?: string | null
+    address_id: number
+    system_id: number
+    system?: {
+      id: number
+      name: string
+    } | null
   }>
   works: Array<{
     id: number
+    address_id: number
+    type_of_work_id: number
+    technician_id: number
     description?: string | null
+    type_of_work?: {
+      id: number
+      name: string
+    } | null
+    technician?: {
+      id: number
+      email: string
+      username?: string | null
+    } | null
   }>
   technicians?: Array<{
     id: number
-    full_name?: string | null
+    contractor_id: number
+    address_id: number
+    technician_id: number
+    user?: {
+      id: number
+      username: string
+      email: string
+    } | null
   }>
 }
 
@@ -50,6 +74,17 @@ export type ContractorRecord = {
     id: number
     address_name: string
   }>
+  technician_contractor: Array<{
+    id: number
+    contractor_id: number
+    address_id: number
+    technician_id: number
+  }>
+  technicians: Array<{
+    id: number
+    username: string
+    email: string
+  }>
 }
 
 export type CuratorRequestRecord = {
@@ -65,6 +100,66 @@ export type CuratorRequestRecord = {
   }
   user: {
     id: number
+    email: string
+  }
+}
+
+export type SystemRecord = {
+  id: number
+  name: string
+  addresses: Array<{
+    id: number
+    address_id: number
+    system_id: number
+    system: {
+      id: number
+      name: string
+    }
+  }>
+}
+
+export type TypeOfWorkRecord = {
+  id: number
+  name: string
+}
+
+export type WorkRecord = {
+  id: number
+  address_id: number
+  type_of_work_id: number
+  technician_id: number
+  description: string | null
+  address: {
+    id: number
+    address_name: string
+  }
+  type_of_work: {
+    id: number
+    name: string
+  }
+  technician: {
+    id: number
+    username: string
+    email: string
+  }
+}
+
+export type TechnicianAssignmentRecord = {
+  id: number
+  contractor_id: number
+  address_id: number
+  technician_id: number
+  contractor: {
+    id: number
+    name_of_contractor: string
+  }
+  address: {
+    id: number
+    address_name: string
+  }
+  user: {
+    id: number
+    username: string
     email: string
   }
 }

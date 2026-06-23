@@ -9,17 +9,12 @@ type QuickAction = {
 
 type OverviewWorkspaceProps = {
   quickActions: QuickAction[]
-  serviceState: {
-    api: string
-    database: string
-  }
   usersCountLabel: string
   twoFactorLabel: string
 }
 
 export function OverviewWorkspace({
   quickActions,
-  serviceState,
   usersCountLabel,
   twoFactorLabel,
 }: OverviewWorkspaceProps) {
@@ -51,8 +46,6 @@ export function OverviewWorkspace({
         <div className="rounded-[30px] border border-white/10 bg-[#0b0b0c] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-8">
           <h3 className="text-2xl font-semibold text-white">Текущее состояние</h3>
           <div className="mt-6 grid gap-3">
-            <MetricCard label="API" value={serviceState.api} />
-            <MetricCard label="База данных" value={serviceState.database} />
             <MetricCard label="Пользователи" value={usersCountLabel} />
             <MetricCard label="2FA" value={twoFactorLabel} />
           </div>

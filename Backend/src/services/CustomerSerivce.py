@@ -13,7 +13,13 @@ class CustomerService:
         self.session = session
 
     async def create(self, data: CustomerCreate) -> CustomerModel:
-        customer = CustomerModel(**data.dict())
+        existing = await self.session.execute(
+            select(CustomerModel).where(CustomerModel.email == data.email)
+        )
+        if existing.scalar_one_or_none():
+            raise ValueError("Customer with this email already exists")
+
+        customer = CustomerModel(**data.model_dump())
         self.session.add(customer)
         await self.session.commit()
         await self.session.refresh(customer, attribute_names=['addresses', 'curators'])
@@ -43,7 +49,15 @@ class CustomerService:
         customer = await self.get_by_id(customer_id)
         if not customer:
             return None
-        for field, value in data.dict(exclude_unset=True).items():
+        update_data = data.model_dump(exclude_unset=True)
+        if "email" in update_data and update_data["email"] != customer.email:
+            existing = await self.session.execute(
+                select(CustomerModel).where(CustomerModel.email == update_data["email"], CustomerModel.id != customer_id)
+            )
+            if existing.scalar_one_or_none():
+                raise ValueError("Customer with this email already exists")
+
+        for field, value in update_data.items():
             setattr(customer, field, value)
         await self.session.commit()
         await self.session.refresh(customer, attribute_names=['addresses', 'curators'])
