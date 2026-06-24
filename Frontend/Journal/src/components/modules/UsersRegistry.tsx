@@ -6,13 +6,14 @@ type UsersRegistryProps = {
   loading: boolean
   canManage: boolean
   onReload: () => void
-  onUpdate: (userId: number, payload: { username?: string; email?: string; phone?: string; role?: string; is_active?: boolean; password?: string }) => Promise<void>
+  onUpdate: (userId: number, payload: { name?: string; username?: string; email?: string; phone?: string; role?: string; is_active?: boolean; password?: string }) => Promise<void>
   onActivate: (userId: number) => Promise<void>
   onDelete: (userId: number) => Promise<void>
 }
 
 export function UsersRegistry({ users, loading, canManage, onReload, onUpdate, onActivate, onDelete }: UsersRegistryProps) {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+  const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -26,6 +27,7 @@ export function UsersRegistry({ users, loading, canManage, onReload, onUpdate, o
 
   useEffect(() => {
     if (selectedUser) {
+      setName(selectedUser.name ?? '')
       setUsername(selectedUser.username)
       setEmail(selectedUser.email)
       setPhone(selectedUser.phone)
@@ -46,6 +48,7 @@ export function UsersRegistry({ users, loading, canManage, onReload, onUpdate, o
     }
 
     await onUpdate(selectedUser.id, {
+      name,
       username,
       email,
       phone,
@@ -102,7 +105,8 @@ export function UsersRegistry({ users, loading, canManage, onReload, onUpdate, o
                       <td className="px-4 py-4">{user.id}</td>
                       <td className="px-4 py-4">
                         <div className="space-y-1">
-                          <p className="text-white">{user.username}</p>
+                          <p className="text-white">{user.name ?? user.username}</p>
+                          <p className="text-xs text-zinc-500">{user.username}</p>
                           <p className="text-xs text-zinc-500">Подрядчик: {user.contractor_id ?? 'Не привязан'}</p>
                         </div>
                       </td>
@@ -162,7 +166,7 @@ export function UsersRegistry({ users, loading, canManage, onReload, onUpdate, o
           {selectedUser ? (
             <>
               <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-sm font-medium text-white">{selectedUser.username}</p>
+                <p className="text-sm font-medium text-white">{selectedUser.name ?? selectedUser.username}</p>
                 <p className="mt-1 text-xs text-zinc-500">{selectedUser.email}</p>
                 <p className="mt-3 text-xs text-zinc-400">
                   Роль: {selectedUser.role} · Телефон: {selectedUser.phone || 'Не указан'}
@@ -171,7 +175,8 @@ export function UsersRegistry({ users, loading, canManage, onReload, onUpdate, o
 
               {canManage ? (
                 <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
-                  <Field label="Логин" value={username} onChange={setUsername} placeholder="Имя пользователя" />
+                  <Field label="Имя" value={name} onChange={setName} placeholder="Введите имя" />
+                  <Field label="Логин" value={username} onChange={setUsername} placeholder="username" />
                   <Field label="Email" value={email} onChange={setEmail} placeholder="email@example.com" />
                   <Field label="Телефон" value={phone} onChange={setPhone} placeholder="+7 ..." />
                   <label className="grid gap-2 text-sm text-zinc-300">

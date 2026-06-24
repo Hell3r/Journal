@@ -3,6 +3,7 @@ import type { LoginSuccessResponse, LoginTwoFactorResponse } from '../types/auth
 import type { UserRecord } from '../types/users'
 
 type RegisterPayload = {
+  name: string
   username: string
   email: string
   phone: string

@@ -23,5 +23,13 @@ class CuratorModel(Base):
     )
 
     @property
+    def name(self) -> Optional[str]:
+        if self.user and self.user.name:
+            return self.user.name
+        if self.user and self.user.username:
+            return self.user.username
+        return None
+
+    @property
     def email(self) -> Optional[str]:
         return self.user.email if self.user else None

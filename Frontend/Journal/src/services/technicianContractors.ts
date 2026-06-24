@@ -3,7 +3,7 @@ import type { TechnicianAssignmentRecord } from '../types/domain'
 
 type TechnicianAssignmentCreatePayload = {
   contractor_id: number
-  address_id: number
+  address_id?: number | null
   technician_id: number
 }
 

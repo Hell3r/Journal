@@ -8,6 +8,7 @@ from src.schemas.contractor_addresses import AddressShort, ContractorShort
 
 class UserShort(BaseModel):
     id: int
+    name: Optional[str] = None
     username: str
     email: str
 
@@ -16,17 +17,17 @@ class UserShort(BaseModel):
 
 class TechnicianContractorCreate(BaseModel):
     contractor_id: int
-    address_id: int
+    address_id: Optional[int] = None
     technician_id: int
 
 
 class TechnicianContractorResponse(BaseModel):
     id: int
     contractor_id: int
-    address_id: int
+    address_id: Optional[int] = None
     technician_id: int
     contractor: ContractorShort
-    address: AddressShort
+    address: Optional[AddressShort] = None
     user: UserShort
 
     model_config = ConfigDict(from_attributes=True)

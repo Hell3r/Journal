@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.addresses import AddressModel
 from src.models.curators import CuratorModel
 from src.models.types_of_works import TypesOfWorksModel
+from src.models.systems import SystemsModel
+from src.models.systems_on_address import SystemOnAddressModel
 from src.models.users import UserModel
 from src.models.works import WorksModel
 from src.schemas.works import WorkCreate, WorkUpdate
@@ -33,17 +35,26 @@ class WorksService:
 
     async def _eager_stmt(self):
         return select(WorksModel).options(
-            selectinload(WorksModel.address),
+            selectinload(WorksModel.address).selectinload(AddressModel.systems).selectinload(SystemOnAddressModel.system),
             selectinload(WorksModel.type_of_work),
             selectinload(WorksModel.technician),
+            selectinload(WorksModel.system),
         )
 
     async def create(self, data: WorkCreate, user: UserModel) -> WorksModel:
-        address = await self.session.get(AddressModel, data.address_id)
+        address_stmt = select(AddressModel).options(selectinload(AddressModel.systems)).where(AddressModel.id == data.address_id)
+        address_result = await self.session.execute(address_stmt)
+        address = address_result.scalar_one_or_none()
         if not address:
             raise ValueError("Address not found")
         if not await self._check_curator_or_admin(user, address.customer_id):
             raise PermissionError("Only active curator of this organisation or admin can manage works")
+
+        system = await self.session.get(SystemsModel, data.system_id)
+        if not system:
+            raise ValueError("System not found")
+        if data.system_id not in {relation.system_id for relation in address.systems}:
+            raise ValueError("System is not assigned to this address")
 
         if not await self.session.get(TypesOfWorksModel, data.type_of_work_id):
             raise ValueError("Type of work not found")
@@ -76,11 +87,23 @@ class WorksService:
 
         update_data = data.model_dump(exclude_unset=True)
         target_address_id = update_data.get("address_id", work.address_id)
-        address = await self.session.get(AddressModel, target_address_id)
+        address_stmt = select(AddressModel).options(selectinload(AddressModel.systems)).where(AddressModel.id == target_address_id)
+        address_result = await self.session.execute(address_stmt)
+        address = address_result.scalar_one_or_none()
         if not address:
             raise ValueError("Address not found")
         if not await self._check_curator_or_admin(user, address.customer_id):
             raise PermissionError("Only active curator of this organisation or admin can manage works")
+
+        if "system_id" in update_data:
+            system = await self.session.get(SystemsModel, update_data["system_id"])
+            if not system:
+                raise ValueError("System not found")
+            if update_data["system_id"] not in {relation.system_id for relation in address.systems}:
+                raise ValueError("System is not assigned to this address")
+        elif work.system_id is not None:
+            if work.system_id not in {relation.system_id for relation in address.systems}:
+                raise ValueError("System is not assigned to this address")
 
         if "type_of_work_id" in update_data and not await self.session.get(TypesOfWorksModel, update_data["type_of_work_id"]):
             raise ValueError("Type of work not found")

@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List
 
 class UserBase(BaseModel):
+    name: Optional[str] = None
     username: str
     email: str
     phone: str
@@ -10,10 +11,12 @@ class UserBase(BaseModel):
     is_active: bool = True
 
 class UserCreate(UserBase):
+    name: str
     password: str
     date_joined: Optional[datetime] = Field(default_factory=datetime.now)
 
 class UserUpdate(BaseModel):
+    name: Optional[str] = None
     username: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None

@@ -12,6 +12,7 @@ class AddressShort(BaseModel):
 
 class UserShort(BaseModel):
     id: int
+    name: Optional[str] = None
     email: str
     username: Optional[str] = None
 

@@ -15,7 +15,7 @@ export function ProfileWorkspace({ session, roleTitle, roleDescription }: Profil
           Профиль текущего пользователя и его роль в системе электронного журнала.
         </p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <InfoTile label="Пользователь" value={session.user.username} />
+          <InfoTile label="Имя" value={session.user.name ?? session.user.username} />
           <InfoTile label="Email" value={session.user.email} />
           <InfoTile label="Роль" value={roleTitle} />
           <InfoTile label="Статус" value={session.user.is_active ? 'Активен' : 'Ожидает активации'} />

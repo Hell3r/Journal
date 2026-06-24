@@ -42,6 +42,7 @@ export function AuthScreen({
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
+  const [registerName, setRegisterName] = useState('')
   const [registerUsername, setRegisterUsername] = useState('')
   const [registerEmail, setRegisterEmail] = useState('')
   const [registerPhone, setRegisterPhone] = useState('')
@@ -86,7 +87,7 @@ export function AuthScreen({
         twoFactorEnabled: false,
       })
       onPendingTwoFactorChange(null)
-      onStatusMessageChange(`Вход выполнен. Добро пожаловать, ${response.user_info.username}.`)
+      onStatusMessageChange(`Вход выполнен. Добро пожаловать, ${response.user_info.name ?? response.user_info.username}.`)
       onStatusToneChange('success')
       onLastResponseChange(JSON.stringify(response, null, 2))
     } catch (error) {
@@ -116,7 +117,7 @@ export function AuthScreen({
         twoFactorEnabled: true,
       })
       onPendingTwoFactorChange(null)
-      onStatusMessageChange(`Код подтверждён. Добро пожаловать, ${response.user_info.username}.`)
+      onStatusMessageChange(`Код подтверждён. Добро пожаловать, ${response.user_info.name ?? response.user_info.username}.`)
       onStatusToneChange('success')
       onLastResponseChange(JSON.stringify(response, null, 2))
       setCode('')
@@ -133,6 +134,7 @@ export function AuthScreen({
 
     try {
       const response = await registerUser({
+        name: registerName,
         username: registerUsername,
         email: registerEmail,
         phone: registerPhone,
@@ -148,6 +150,7 @@ export function AuthScreen({
       setMode('login')
       setUsername(registerUsername)
       setPassword(registerPassword)
+      setRegisterName('')
       setRegisterUsername('')
       setRegisterEmail('')
       setRegisterPhone('')
@@ -263,7 +266,13 @@ export function AuthScreen({
 
                 <form className="grid gap-2.5" onSubmit={handleRegister}>
                   <AuthField
-                    label="Имя пользователя"
+                    label="Имя"
+                    placeholder="Введите имя"
+                    value={registerName}
+                    onChange={setRegisterName}
+                  />
+                  <AuthField
+                    label="Логин"
                     placeholder="Введите username"
                     value={registerUsername}
                     onChange={setRegisterUsername}

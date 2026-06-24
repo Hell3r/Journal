@@ -32,6 +32,7 @@ class UserService:
     async def create(self, data: UserCreate) -> UserModel:
         await self._ensure_unique(data.username, data.email)
         user = UserModel(
+            name=data.name,
             username=data.username,
             email=data.email,
             phone=data.phone,
@@ -50,6 +51,17 @@ class UserService:
 
     async def get_all(self, skip: int = 0, limit: int = 100) -> List[UserModel]:
         stmt = select(UserModel).offset(skip).limit(limit).order_by(UserModel.id.asc())
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_available(self, skip: int = 0, limit: int = 100) -> List[UserModel]:
+        stmt = (
+            select(UserModel)
+            .where(UserModel.is_active.is_(True))
+            .offset(skip)
+            .limit(limit)
+            .order_by(UserModel.id.asc())
+        )
         result = await self.session.execute(stmt)
         return result.scalars().all()
 

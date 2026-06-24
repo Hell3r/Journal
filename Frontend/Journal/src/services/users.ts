@@ -2,6 +2,7 @@ import { apiRequest } from './api'
 import type { UserRecord } from '../types/users'
 
 type UserUpdatePayload = {
+  name?: string
   username?: string
   email?: string
   phone?: string
@@ -26,6 +27,13 @@ export function getUser(userId: number, token?: string) {
 
 export function getCurrentUser(token?: string) {
   return apiRequest<UserRecord>('/v1/users/me', {
+    method: 'GET',
+    token,
+  })
+}
+
+export function getAssignableUsers(token?: string) {
+  return apiRequest<UserRecord[]>('/v1/users/available', {
     method: 'GET',
     token,
   })

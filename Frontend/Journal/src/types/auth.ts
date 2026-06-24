@@ -1,4 +1,5 @@
 export type UserSessionInfo = {
+  name?: string | null
   username: string
   email: string
   user_id: number

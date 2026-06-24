@@ -9,7 +9,7 @@ class TechnicianModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     contractor_id: Mapped[int] = mapped_column(ForeignKey("contractors.id", ondelete="CASCADE"))
-    address_id: Mapped[int] = mapped_column(ForeignKey("addresses.id", ondelete="CASCADE"))
+    address_id: Mapped[Optional[int]] = mapped_column(ForeignKey("addresses.id", ondelete="CASCADE"), nullable=True)
     technician_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
 

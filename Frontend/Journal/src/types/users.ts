@@ -1,5 +1,6 @@
 export type UserRecord = {
   id: number
+  name?: string | null
   username: string
   email: string
   phone: string

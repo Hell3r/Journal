@@ -1,9 +1,11 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 
 class UserShort(BaseModel):
     id: int
+    name: Optional[str] = None
     email: str
 
     model_config = ConfigDict(from_attributes=True)

@@ -5,7 +5,7 @@ import type { UserRecord } from '../../types/users'
 type ContractorsWorkspaceProps = {
   canCreate: boolean
   contractors: ContractorRecord[]
-  engineers: UserRecord[]
+  users: UserRecord[]
   addresses: AddressRecord[]
   loading: boolean
   onCreate: (payload: { name_of_contractor: string; engineer_id?: number | null }) => Promise<void>
@@ -19,7 +19,7 @@ type ContractorsWorkspaceProps = {
 export function ContractorsWorkspace({
   canCreate,
   contractors,
-  engineers,
+  users,
   addresses,
   loading,
   onCreate,
@@ -38,6 +38,7 @@ export function ContractorsWorkspace({
     () => contractors.find((item) => item.id === selectedContractorId) ?? null,
     [selectedContractorId, contractors]
   )
+  const availableUsers = useMemo(() => users.filter((user) => user.role === 'user'), [users])
 
   useEffect(() => {
     if (!selectedContractorId && contractors.length > 0) {
@@ -104,7 +105,7 @@ export function ContractorsWorkspace({
                 <div>
                   <p className="text-sm font-medium text-white">{contractor.name_of_contractor}</p>
                   <p className="mt-1 text-xs text-zinc-500">
-                    Инженер: {contractor.engineer?.email ?? 'Не назначен'}
+                    Пользователь: {contractor.engineer?.name ?? contractor.engineer?.email ?? 'Не назначен'}
                   </p>
                 </div>
                 <span className={`rounded-full border px-3 py-1 text-xs ${contractor.is_active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}>
@@ -126,7 +127,7 @@ export function ContractorsWorkspace({
           <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
             <Field label="Название подрядчика" value={name} onChange={setName} placeholder="Введите название" />
             <label className="grid gap-2 text-sm text-zinc-300">
-              <span>Инженер</span>
+              <span>Пользователь</span>
               <select
                 className="h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none"
                 onChange={(event) => setEngineerId(event.target.value)}
@@ -135,13 +136,14 @@ export function ContractorsWorkspace({
                 <option className="bg-zinc-950" value="">
                   Не назначать
                 </option>
-                {engineers.map((engineer) => (
-                  <option key={engineer.id} className="bg-zinc-950" value={engineer.id}>
-                    {engineer.username} ({engineer.email})
+                {availableUsers.map((user) => (
+                  <option key={user.id} className="bg-zinc-950" value={user.id}>
+                    {user.name ?? user.username} ({user.email})
                   </option>
                 ))}
               </select>
             </label>
+            <p className="text-xs text-zinc-500">В списке показываются только пользователи с ролью `user`.</p>
 
             <div className="flex flex-wrap gap-2">
               <button className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-200">

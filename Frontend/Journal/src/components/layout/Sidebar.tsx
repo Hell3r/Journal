@@ -47,7 +47,7 @@ export function Sidebar({ activeRoute, actionLabel, onLogout, onRouteChange, rou
         <div className="mt-8 rounded-[24px] border border-white/10 bg-black/30 p-4">
           <p className="text-xs uppercase tracking-[0.28em] text-zinc-500">Аккаунт</p>
           <div className="mt-3 space-y-2 text-sm text-zinc-300">
-            <p className="text-white">{session.user.username}</p>
+            <p className="text-white">{session.user.name ?? session.user.username}</p>
             <p>{session.user.role}</p>
             <p>{session.user.email}</p>
           </div>

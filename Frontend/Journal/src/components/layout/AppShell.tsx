@@ -13,7 +13,7 @@ import { SystemsWorkspace } from '../workspaces/SystemsWorkspace'
 import { WorksWorkspace } from '../workspaces/WorksWorkspace'
 import { TechniciansWorkspace } from '../workspaces/TechniciansWorkspace'
 import { disableTwoFactor, enableTwoFactor, logoutUser, verifyAndActivateTwoFactor } from '../../services/auth'
-import { deleteUser, getUsers, activateUser, updateUser } from '../../services/users'
+import { deleteUser, getUsers, activateUser, updateUser, getAssignableUsers } from '../../services/users'
 import { createAddress, deleteAddress, getAddresses, updateAddress } from '../../services/addresses'
 import {
   addAddressToContractor,
@@ -68,7 +68,7 @@ type AppShellProps = {
   onTwoFactorSetupChange: (value: TwoFactorSetupState | null) => void
 }
 
-type LoadersState = Record<'users' | 'customers' | 'addresses' | 'contractors' | 'curators' | 'systems' | 'works' | 'technicians', boolean>
+type LoadersState = Record<'users' | 'staff' | 'customers' | 'addresses' | 'contractors' | 'curators' | 'systems' | 'works' | 'technicians', boolean>
 
 const roleMeta: Record<string, { title: string; description: string }> = {
   admin: {
@@ -113,6 +113,7 @@ export function AppShell({
   onTwoFactorSetupChange,
 }: AppShellProps) {
   const [users, setUsers] = useState<UserRecord[]>([])
+  const [staffUsers, setStaffUsers] = useState<UserRecord[]>([])
   const [customers, setCustomers] = useState<CustomerRecord[]>([])
   const [addresses, setAddresses] = useState<AddressRecord[]>([])
   const [contractors, setContractors] = useState<ContractorRecord[]>([])
@@ -123,6 +124,7 @@ export function AppShell({
   const [technicianAssignments, setTechnicianAssignments] = useState<TechnicianAssignmentRecord[]>([])
   const [loaders, setLoaders] = useState<LoadersState>({
     users: false,
+    staff: false,
     customers: false,
     addresses: false,
     contractors: false,
@@ -139,7 +141,110 @@ export function AppShell({
 
   const routes = useMemo(() => getRoutesForRole(session.user.role), [session.user.role])
   const roleInfo = roleMeta[session.user.role] ?? roleMeta.user
-  const engineers = useMemo(() => users.filter((user) => user.role === 'engineer'), [users])
+  const visibleCustomerIds = useMemo(() => {
+    if (session.user.role === 'admin') {
+      return null
+    }
+
+    if (session.user.role === 'curator') {
+      return new Set(
+        customers
+          .filter((customer) => customer.curators.some((curator) => curator.user_id === session.user.user_id))
+          .map((customer) => customer.id)
+      )
+    }
+
+    return null
+  }, [customers, session.user.role, session.user.user_id])
+  const visibleCustomers = useMemo(() => {
+    if (session.user.role === 'admin') {
+      return customers
+    }
+
+    if (visibleCustomerIds) {
+      return customers.filter((customer) => visibleCustomerIds.has(customer.id))
+    }
+
+    return customers
+  }, [customers, session.user.role, visibleCustomerIds])
+  const visibleAddresses = useMemo(() => {
+    if (session.user.role === 'technician') {
+      const addressIds = new Set(
+        technicianAssignments
+          .filter((assignment) => assignment.user.id === session.user.user_id)
+          .map((assignment) => assignment.address_id)
+      )
+      return addresses.filter((address) => addressIds.has(address.id))
+    }
+
+    if (session.user.role === 'engineer') {
+      const addressIds = new Set(
+        contractors
+          .filter((contractor) => contractor.engineer_id === session.user.user_id)
+          .flatMap((contractor) => contractor.addresses.map((address) => address.id))
+      )
+      return addresses.filter((address) => addressIds.has(address.id))
+    }
+
+    if (visibleCustomerIds) {
+      return addresses.filter((address) => visibleCustomerIds.has(address.customer_id))
+    }
+
+    return addresses
+  }, [addresses, contractors, session.user.role, session.user.user_id, technicianAssignments, visibleCustomerIds])
+  const visibleContractors = useMemo(() => {
+    if (session.user.role === 'engineer') {
+      return contractors.filter((item) => item.engineer_id === session.user.user_id)
+    }
+    if (session.user.role === 'curator') {
+      const allowedAddressIds = new Set(visibleAddresses.map((address) => address.id))
+      return contractors.filter((contractor) =>
+        contractor.addresses.some((address) => allowedAddressIds.has(address.id))
+      )
+    }
+    return contractors
+  }, [contractors, session.user.role, session.user.user_id, visibleAddresses])
+  const visibleAddressIds = useMemo(() => {
+    if (session.user.role === 'technician') {
+      return new Set(
+        technicianAssignments
+          .filter((assignment) => assignment.user.id === session.user.user_id)
+          .map((assignment) => assignment.address_id)
+      )
+    }
+
+    if (session.user.role === 'engineer') {
+      return new Set(
+        visibleContractors.flatMap((contractor) => contractor.addresses.map((address) => address.id))
+      )
+    }
+
+    return null
+  }, [session.user.role, session.user.user_id, technicianAssignments, visibleContractors])
+  const visibleSystems = useMemo(() => {
+    if (!visibleAddressIds) {
+      return systems
+    }
+
+    return systems.filter((system) =>
+      system.addresses.some((relation) => visibleAddressIds.has(relation.address_id))
+    )
+  }, [systems, visibleAddressIds])
+  const visibleWorks = useMemo(() => {
+    if (!visibleAddressIds) {
+      return works
+    }
+
+    return works.filter((work) => visibleAddressIds.has(work.address_id))
+  }, [works, visibleAddressIds])
+  const visibleAssignableUsers = useMemo(
+    () => staffUsers.filter((user) => user.role === 'user'),
+    [staffUsers]
+  )
+  const visibleTechnicians = useMemo(
+    () => staffUsers.filter((user) => user.role === 'technician'),
+    [staffUsers]
+  )
 
   useEffect(() => {
     if (!routes.some((route) => route.key === activeRoute)) {
@@ -165,11 +270,35 @@ export function AppShell({
     if (activeRoute === 'addresses' && customers.length === 0) {
       void loadCustomers()
     }
+    if (activeRoute === 'addresses' && systems.length === 0) {
+      void loadSystems()
+    }
+    if (activeRoute === 'addresses' && staffUsers.length === 0) {
+      void loadStaffUsers()
+    }
+    if (activeRoute === 'works' && addresses.length === 0) {
+      void loadAddresses()
+    }
+    if (activeRoute === 'works' && customers.length === 0) {
+      void loadCustomers()
+    }
+    if (activeRoute === 'works' && systems.length === 0) {
+      void loadSystems()
+    }
+    if (activeRoute === 'technicians' && contractors.length === 0) {
+      void loadContractors()
+    }
+    if (activeRoute === 'technicians' && customers.length === 0) {
+      void loadCustomers()
+    }
+    if (activeRoute === 'technicians' && addresses.length === 0) {
+      void loadAddresses()
+    }
     if (activeRoute === 'contractors' && contractors.length === 0) {
       void loadContractors()
     }
-    if ((activeRoute === 'contractors' || activeRoute === 'works' || activeRoute === 'technicians' || activeRoute === 'systems') && users.length === 0) {
-      void loadUsers()
+    if ((activeRoute === 'contractors' || activeRoute === 'works' || activeRoute === 'technicians') && staffUsers.length === 0) {
+      void loadStaffUsers()
     }
     if (activeRoute === 'systems' && systems.length === 0) {
       void loadSystems()
@@ -183,7 +312,7 @@ export function AppShell({
     if (activeRoute === 'curator-requests' && curatorRequests.length === 0) {
       void loadCuratorRequests()
     }
-  }, [activeRoute])
+  }, [activeRoute, users.length, staffUsers.length, customers.length, addresses.length, contractors.length, systems.length, works.length, technicianAssignments.length, curatorRequests.length, session.user.role])
 
   const statusClassName =
     statusTone === 'success'
@@ -234,6 +363,15 @@ export function AppShell({
       onLastResponseChange(JSON.stringify(response, null, 2))
     })
 
+  const loadStaffUsers = async () =>
+    withLoader('staff', async () => {
+      const response = await getAssignableUsers(session.token)
+      setStaffUsers(response)
+      onStatusMessageChange('Список пользователей для назначений загружен.')
+      onStatusToneChange('success')
+      onLastResponseChange(JSON.stringify(response, null, 2))
+    })
+
   const loadCustomers = async () =>
     withLoader('customers', async () => {
       const response = await getCustomers(session.token)
@@ -269,7 +407,7 @@ export function AppShell({
       ])
       setSystems(systemsResponse)
       setTypesOfWorks(typesResponse)
-      onStatusMessageChange('Справочники СПЗ и типов работ загружены.')
+      onStatusMessageChange('Справочники ППЗ и типов работ загружены.')
       onStatusToneChange('success')
       onLastResponseChange(JSON.stringify({ systems: systemsResponse, types: typesResponse }, null, 2))
     })
@@ -396,7 +534,11 @@ export function AppShell({
   const handleCreateContractor = async (payload: { name_of_contractor: string; engineer_id?: number | null }) =>
     runAction('createContractor', async () => {
       await createContractor({ ...payload, is_active: true }, session.token)
-      await loadContractors()
+      await Promise.all([
+        loadContractors(),
+        loadStaffUsers(),
+        session.user.role === 'admin' ? loadUsers() : Promise.resolve(),
+      ])
       onStatusMessageChange('Подрядная организация добавлена.')
       onStatusToneChange('success')
     })
@@ -468,7 +610,11 @@ export function AppShell({
   const handleUpdateContractor = async (contractorId: number, payload: Parameters<typeof updateContractor>[1]) =>
     runAction('updateContractor', async () => {
       await updateContractor(contractorId, payload, session.token)
-      await loadContractors()
+      await Promise.all([
+        loadContractors(),
+        loadStaffUsers(),
+        session.user.role === 'admin' ? loadUsers() : Promise.resolve(),
+      ])
       onStatusMessageChange('Подрядчик обновлён.')
       onStatusToneChange('success')
     })
@@ -529,7 +675,7 @@ export function AppShell({
       onStatusToneChange('success')
     })
 
-  const handleCreateWork = async (payload: { address_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) =>
+  const handleCreateWork = async (payload: { address_id: number; system_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) =>
     runAction('createWork', async () => {
       await createWork(payload, session.token)
       await Promise.all([loadWorks(), loadAddresses()])
@@ -545,7 +691,7 @@ export function AppShell({
       onStatusToneChange('success')
     })
 
-  const handleCreateTechnicianAssignment = async (payload: { contractor_id: number; address_id: number; technician_id: number }) =>
+  const handleCreateTechnicianAssignment = async (payload: { contractor_id: number; address_id?: number | null; technician_id: number }) =>
     runAction('createTechnicianAssignment', async () => {
       await createTechnicianAssignment(payload, session.token)
       await loadTechnicians()
@@ -838,12 +984,12 @@ export function AppShell({
 
           {activeRoute === 'addresses' && (
             <AddressesWorkspace
-              addresses={addresses}
+              addresses={visibleAddresses}
               canManage={session.user.role === 'admin' || session.user.role === 'curator'}
-              customers={customers}
-              systems={systems}
+              customers={visibleCustomers}
+              systems={visibleSystems}
               typesOfWorks={typesOfWorks}
-              technicians={users}
+              technicians={visibleTechnicians}
               loading={loaders.addresses}
               onCreate={handleCreateAddress}
               onDelete={handleDeleteAddress}
@@ -867,7 +1013,7 @@ export function AppShell({
 
           {activeRoute === 'systems' && (
             <SystemsWorkspace
-              canManage={session.user.role === 'admin'}
+              canManage={session.user.role === 'admin' || session.user.role === 'curator'}
               loading={loaders.systems}
               onCreateSystem={async (payload) => {
                 await createSystem(payload, session.token)
@@ -882,7 +1028,7 @@ export function AppShell({
               onReload={() => void loadSystems()}
               onUpdateSystem={handleUpdateSystem}
               onUpdateTypeOfWork={handleUpdateTypeOfWork}
-              systems={systems}
+              systems={visibleSystems}
               typesOfWorks={typesOfWorks}
             />
           )}
@@ -890,8 +1036,8 @@ export function AppShell({
           {activeRoute === 'contractors' && (
             <ContractorsWorkspace
               canCreate={session.user.role === 'admin' || session.user.role === 'curator'}
-              contractors={session.user.role === 'engineer' ? contractors.filter((item) => item.engineer_id === session.user.user_id) : contractors}
-              engineers={engineers}
+              contractors={visibleContractors}
+              users={visibleAssignableUsers}
               loading={loaders.contractors}
               onCreate={handleCreateContractor}
               onAddAddress={handleAddAddressToContractor}
@@ -906,15 +1052,15 @@ export function AppShell({
           {activeRoute === 'works' && (
             <WorksWorkspace
               canManage={session.user.role === 'admin' || session.user.role === 'curator' || session.user.role === 'engineer'}
-              addresses={addresses}
+              addresses={visibleAddresses}
+              customers={customers}
               loading={loaders.works}
               onCreate={handleCreateWork}
               onDelete={handleDeleteWork}
               onReload={(addressId?: number) => void loadWorks(addressId)}
-              systems={systems}
-              technicians={users}
+              technicians={visibleTechnicians}
               typesOfWorks={typesOfWorks}
-              works={works}
+              works={visibleWorks}
             />
           )}
 
@@ -922,12 +1068,13 @@ export function AppShell({
             <TechniciansWorkspace
               canManage={session.user.role === 'admin' || session.user.role === 'curator' || session.user.role === 'engineer'}
               assignments={technicianAssignments}
-              contractors={contractors}
+              contractors={visibleContractors}
               loading={loaders.technicians}
+              role={session.user.role}
               onCreate={handleCreateTechnicianAssignment}
               onDelete={handleDeleteTechnicianAssignment}
               onReload={() => void loadTechnicians()}
-              technicians={users}
+              technicians={visibleAssignableUsers}
             />
           )}
 

@@ -8,7 +8,8 @@ type TechniciansWorkspaceProps = {
   assignments: TechnicianAssignmentRecord[]
   contractors: ContractorRecord[]
   technicians: UserRecord[]
-  onCreate: (payload: { contractor_id: number; address_id: number; technician_id: number }) => Promise<void>
+  role: string
+  onCreate: (payload: { contractor_id: number; address_id?: number | null; technician_id: number }) => Promise<void>
   onDelete: (assignmentId: number) => Promise<void>
   onReload: () => void
 }
@@ -19,6 +20,7 @@ export function TechniciansWorkspace({
   assignments,
   contractors,
   technicians,
+  role,
   onCreate,
   onDelete,
   onReload,
@@ -26,21 +28,45 @@ export function TechniciansWorkspace({
   const [contractorId, setContractorId] = useState('')
   const [addressId, setAddressId] = useState('')
   const [technicianId, setTechnicianId] = useState('')
+  const [filterContractorId, setFilterContractorId] = useState('')
 
   const contractorAddresses = useMemo(() => {
     const contractor = contractors.find((item) => String(item.id) === contractorId)
     return contractor?.addresses ?? []
   }, [contractorId, contractors])
 
+  const filteredAssignments = useMemo(() => {
+    if (!filterContractorId || role === 'engineer') {
+      return assignments
+    }
+
+    return assignments.filter((assignment) => String(assignment.contractor_id) === filterContractorId)
+  }, [assignments, filterContractorId, role])
+
+  const showContractorFilter = role === 'admin' || role === 'curator'
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!contractorId || !addressId || !technicianId) {
+    if (!contractorId || !technicianId) {
+      return
+    }
+
+    const normalizedAddressId =
+      role === 'engineer'
+        ? addressId
+          ? Number(addressId)
+          : null
+        : addressId
+          ? Number(addressId)
+          : null
+
+    if (role !== 'engineer' && normalizedAddressId === null) {
       return
     }
 
     await onCreate({
       contractor_id: Number(contractorId),
-      address_id: Number(addressId),
+      address_id: normalizedAddressId,
       technician_id: Number(technicianId),
     })
     setTechnicianId('')
@@ -65,14 +91,36 @@ export function TechniciansWorkspace({
           </button>
         </div>
 
+        {showContractorFilter && (
+          <div className="mt-6 grid gap-3">
+            <label className="grid gap-2 text-sm text-zinc-300">
+              <span>Фильтр по подрядчику</span>
+              <select
+                className="h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none"
+                onChange={(event) => setFilterContractorId(event.target.value)}
+                value={filterContractorId}
+              >
+                <option className="bg-zinc-950" value="">
+                  Все подрядчики
+                </option>
+                {contractors.map((contractor) => (
+                  <option key={contractor.id} className="bg-zinc-950" value={contractor.id}>
+                    {contractor.name_of_contractor}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+
         <div className="mt-6 grid gap-3">
-          {assignments.map((assignment) => (
+          {filteredAssignments.map((assignment) => (
             <div key={assignment.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-white">{assignment.user.username}</p>
+                  <p className="text-sm font-medium text-white">{assignment.user.name ?? assignment.user.username}</p>
                   <p className="mt-1 text-xs text-zinc-500">
-                    {assignment.contractor.name_of_contractor} · {assignment.address.address_name}
+                    {assignment.contractor.name_of_contractor} · {assignment.address?.address_name ?? 'Без объекта'}
                   </p>
                 </div>
                 {canManage && (
@@ -93,11 +141,22 @@ export function TechniciansWorkspace({
       <div className="rounded-[30px] border border-white/10 bg-[#0b0b0c] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.35)] sm:p-8">
         <h3 className="text-2xl font-semibold text-white">Создание назначения</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          {canManage ? 'Инженер или куратор назначает технику на объект и подрядчика.' : 'Только просмотр назначений.'}
+          {canManage
+            ? role === 'curator'
+              ? 'Куратор назначает техников только на свои объекты и подрядчиков.'
+              : 'Инженер назначает технику только на объекты своей подрядной организации.'
+            : 'Только просмотр назначений.'}
         </p>
         {canManage ? (
           <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
-            <SelectField label="Подрядчик" value={contractorId} onChange={setContractorId}>
+            <SelectField
+              label="Подрядчик"
+              value={contractorId}
+              onChange={(value) => {
+                setContractorId(value)
+                setAddressId('')
+              }}
+            >
               <option className="bg-zinc-950" value="">
                 Выберите подрядчика
               </option>
@@ -110,7 +169,7 @@ export function TechniciansWorkspace({
 
             <SelectField label="Объект" value={addressId} onChange={setAddressId}>
               <option className="bg-zinc-950" value="">
-                {contractorId ? 'Выберите объект' : 'Сначала выберите подрядчика'}
+                {role === 'engineer' ? 'Не назначать' : contractorId ? 'Выберите объект' : 'Сначала выберите подрядчика'}
               </option>
               {contractorAddresses.map((address) => (
                 <option key={address.id} className="bg-zinc-950" value={address.id}>
@@ -118,16 +177,21 @@ export function TechniciansWorkspace({
                 </option>
               ))}
             </SelectField>
+            {role === 'engineer' ? (
+              <p className="text-xs text-zinc-500">
+                Для добавления техника в подрядную организацию объект можно не указывать.
+              </p>
+            ) : null}
 
             <SelectField label="Техник" value={technicianId} onChange={setTechnicianId}>
               <option className="bg-zinc-950" value="">
                 Выберите техника
               </option>
               {technicians
-                .filter((user) => user.role === 'technician' || user.role === 'engineer')
+                .filter((user) => user.role === 'user')
                 .map((user) => (
                   <option key={user.id} className="bg-zinc-950" value={user.id}>
-                    {user.username} ({user.email})
+                    {user.name ?? user.username} ({user.email})
                   </option>
                 ))}
             </SelectField>

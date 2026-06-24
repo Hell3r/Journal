@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import type { AddressRecord, SystemRecord, TypeOfWorkRecord, WorkRecord } from '../../types/domain'
+import type { AddressRecord, CustomerRecord, TypeOfWorkRecord, WorkRecord } from '../../types/domain'
 import type { UserRecord } from '../../types/users'
 
 type WorksWorkspaceProps = {
@@ -7,10 +7,10 @@ type WorksWorkspaceProps = {
   loading: boolean
   works: WorkRecord[]
   addresses: AddressRecord[]
-  systems: SystemRecord[]
+  customers: CustomerRecord[]
   typesOfWorks: TypeOfWorkRecord[]
   technicians: UserRecord[]
-  onCreate: (payload: { address_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) => Promise<void>
+  onCreate: (payload: { address_id: number; system_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) => Promise<void>
   onDelete: (workId: number) => Promise<void>
   onReload: (addressId?: number) => void
 }
@@ -20,7 +20,7 @@ export function WorksWorkspace({
   loading,
   works,
   addresses,
-  systems,
+  customers,
   typesOfWorks,
   technicians,
   onCreate,
@@ -28,6 +28,7 @@ export function WorksWorkspace({
   onReload,
 }: WorksWorkspaceProps) {
   const [addressId, setAddressId] = useState('')
+  const [systemId, setSystemId] = useState('')
   const [typeId, setTypeId] = useState('')
   const [technicianId, setTechnicianId] = useState('')
   const [description, setDescription] = useState('')
@@ -48,14 +49,16 @@ export function WorksWorkspace({
   const actPreview = useMemo(() => {
     const selected = filteredWorks.filter((work) => selectedWorkIds.includes(work.id))
     const address = addresses.find((item) => String(item.id) === addressId)
-    return buildActPreview(selected, address?.address_name ?? 'Выберите объект')
-  }, [filteredWorks, selectedWorkIds, addresses, addressId])
+    const customer = address ? customers.find((item) => item.id === address.customer_id) ?? null : null
+    return buildActPreview(selected, address?.address_name ?? 'Выберите объект', customer)
+  }, [filteredWorks, selectedWorkIds, addresses, addressId, customers])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!addressId || !typeId || !technicianId) return
+    if (!addressId || !systemId || !typeId || !technicianId) return
     await onCreate({
       address_id: Number(addressId),
+      system_id: Number(systemId),
       type_of_work_id: Number(typeId),
       technician_id: Number(technicianId),
       description: description || undefined,
@@ -123,28 +126,27 @@ export function WorksWorkspace({
             <option className="bg-zinc-950" value="">
               Все исполнители
             </option>
-            {technicians
-              .filter((user) => user.role === 'technician' || user.role === 'engineer')
-              .map((user) => (
-                <option key={user.id} className="bg-zinc-950" value={user.id}>
-                  {user.username}
-                </option>
-              ))}
+            {technicians.map((user) => (
+              <option key={user.id} className="bg-zinc-950" value={user.id}>
+                {user.name ?? user.username}
+              </option>
+            ))}
           </SelectField>
         </div>
 
         <div className="mt-6 grid gap-3">
           {filteredWorks.map((work) => {
-            const systemName =
-              systems.find((system) => system.addresses.some((relation) => relation.address_id === work.address_id))
-                ?.name ?? 'СПЗ'
+            const systemName = work.system?.name ?? work.system_name ?? 'СПЗ'
             return (
               <div key={work.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-white">{work.type_of_work.name}</p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      {work.address.address_name} · {work.technician.username}
+                      {work.address.address_name} · {work.technician.name ?? work.technician.username}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+                      {formatWorkDate(work.created_at)}
                     </p>
                     <p className="mt-2 text-xs leading-5 text-zinc-400">{work.description ?? 'Без замечаний'}</p>
                   </div>
@@ -183,7 +185,14 @@ export function WorksWorkspace({
           </p>
           {canManage ? (
             <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
-              <SelectField label="Объект" value={addressId} onChange={setAddressId}>
+          <SelectField
+            label="Объект"
+            value={addressId}
+            onChange={(value) => {
+              setAddressId(value)
+              setSystemId('')
+            }}
+          >
                 <option className="bg-zinc-950" value="">
                   Выберите объект
                 </option>
@@ -192,6 +201,19 @@ export function WorksWorkspace({
                     {address.address_name}
                   </option>
                 ))}
+              </SelectField>
+
+              <SelectField label="Система" value={systemId} onChange={setSystemId}>
+                <option className="bg-zinc-950" value="">
+                  {addressId ? 'Выберите систему' : 'Сначала выберите объект'}
+                </option>
+                {addresses
+                  .find((item) => String(item.id) === addressId)
+                  ?.systems.map((relation) => (
+                    <option key={relation.id} className="bg-zinc-950" value={relation.system_id}>
+                      {relation.system?.name ?? `Система #${relation.system_id}`}
+                    </option>
+                  ))}
               </SelectField>
 
               <SelectField label="Тип работы" value={typeId} onChange={setTypeId}>
@@ -209,13 +231,11 @@ export function WorksWorkspace({
                 <option className="bg-zinc-950" value="">
                   Выберите исполнителя
                 </option>
-                {technicians
-                  .filter((user) => user.role === 'technician' || user.role === 'engineer')
-                  .map((user) => (
-                    <option key={user.id} className="bg-zinc-950" value={user.id}>
-                      {user.username} ({user.email})
-                    </option>
-                  ))}
+                {technicians.map((user) => (
+                  <option key={user.id} className="bg-zinc-950" value={user.id}>
+                    {user.name ?? user.username} ({user.email})
+                  </option>
+                ))}
               </SelectField>
 
               <label className="grid gap-2 text-sm text-zinc-300">
@@ -280,20 +300,64 @@ function SelectField({ label, value, onChange, children }: SelectFieldProps) {
   )
 }
 
-function buildActPreview(selectedWorks: WorkRecord[], addressName: string) {
+function buildActPreview(selectedWorks: WorkRecord[], addressName: string, customer: CustomerRecord | null) {
+  const curatorNames = Array.from(
+    new Set(
+      (customer?.curators ?? [])
+        .map((item) => item.name ?? item.email)
+        .filter((value): value is string => Boolean(value))
+    )
+  )
+  const curatorName =
+    curatorNames.length === 1
+      ? curatorNames[0]
+      : curatorNames.length > 1
+        ? curatorNames.join(', ')
+        : 'Куратор не указан'
+  const technicianNames = Array.from(
+    new Set(
+      selectedWorks
+        .map((work) => work.technician.name ?? work.technician.username)
+        .filter((value): value is string => Boolean(value))
+    )
+  )
+  const technicianName =
+    technicianNames.length === 1
+      ? technicianNames[0]
+      : technicianNames.length > 1
+        ? technicianNames.join(', ')
+        : 'Техник не указан'
   const lines = [
     `АКТ ТЕХНИЧЕСКОГО ОБСЛУЖИВАНИЯ`,
     `Объект: ${addressName}`,
+    `Куратор организации: ${curatorName}`,
     `Дата: ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'full' }).format(new Date())}`,
     '',
     selectedWorks.length
-      ? selectedWorks.map((work, index) => `${index + 1}. ${work.type_of_work.name} — ${work.description ?? 'без замечаний'}`).join('\n')
+      ? selectedWorks
+          .map(
+            (work, index) =>
+              `${index + 1}. ${work.type_of_work.name} — ${work.description ?? 'без замечаний'}\n   Дата: ${formatWorkDate(work.created_at)}\n   Система: ${work.system?.name ?? work.system_name ?? 'СПЗ'}\n   Исполнитель: ${work.technician.name ?? work.technician.username}`
+          )
+          .join('\n')
       : 'Нет выбранных записей для акта.',
     '',
     'Подписи:',
-    'Куратор ____________________',
-    'Инженер ____________________',
+    `Куратор ____________________  ${curatorName}`,
+    `Техник ____________________  ${technicianName}`,
   ]
 
   return lines.join('\n')
+}
+
+function formatWorkDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }

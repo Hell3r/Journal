@@ -54,6 +54,23 @@ async def get_current_profile(
 
 
 @router.get(
+    "/available",
+    response_model=List[UserPublic],
+    tags=["Пользователи"],
+    summary="Получить список доступных пользователей для назначений"
+)
+async def get_available_users(
+    session: SessionDep,
+    current_user: UserModel = Depends(get_current_user)
+):
+    if current_user.role not in {"admin", "curator", "engineer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+
+    service = UserService(session)
+    return await service.get_available()
+
+
+@router.get(
     "/{user_id}",
     response_model=UserPublic,
     tags=["Пользователи"],
@@ -87,6 +104,7 @@ async def login_user(
             "access_token": access_token,
             "token_type": "bearer",
             "user_info": {
+                "name": user.name,
                 "username": user.username,
                 "email": user.email,
                 "user_id": user.id,
@@ -135,6 +153,7 @@ async def login_2fa(
         "access_token": access_token,
         "token_type": "bearer",
         "user_info": {
+            "name": user.name,
             "username": user.username,
             "email": user.email,
             "user_id": user.id,

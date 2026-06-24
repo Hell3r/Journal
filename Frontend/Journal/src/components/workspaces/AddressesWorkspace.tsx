@@ -15,7 +15,7 @@ type AddressesWorkspaceProps = {
   onDelete: (addressId: number) => Promise<void>
   onAddSystemToAddress: (addressId: number, systemId: number) => Promise<void>
   onRemoveSystemFromAddress: (addressId: number, systemId: number) => Promise<void>
-  onCreateWork: (payload: { address_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) => Promise<void>
+  onCreateWork: (payload: { address_id: number; system_id: number; type_of_work_id: number; technician_id: number; description?: string | null }) => Promise<void>
   onDeleteWork: (workId: number) => Promise<void>
   onReload: (customerId?: number) => void
   onReloadCustomers: () => void
@@ -90,11 +90,6 @@ export function AddressesWorkspace({
     }
   }, [addresses, selectedAddressId])
 
-  const techniciansOptions = useMemo(
-    () => technicians.filter((user) => user.role === 'technician' || user.role === 'engineer'),
-    [technicians]
-  )
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -116,12 +111,13 @@ export function AddressesWorkspace({
 
   const handleCreateWork = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!selectedAddress || !workTypeId || !technicianId) {
+    if (!selectedAddress || !systemId || !workTypeId || !technicianId) {
       return
     }
 
     await onCreateWork({
       address_id: selectedAddress.id,
+      system_id: Number(systemId),
       type_of_work_id: Number(workTypeId),
       technician_id: Number(technicianId),
       description: workDescription || undefined,
@@ -198,7 +194,12 @@ export function AddressesWorkspace({
                 </div>
                 <div className="mt-3 grid gap-2 text-xs text-zinc-400 sm:grid-cols-3">
                   <div>Подрядчиков: {address.contractors.length}</div>
-                  <div>Последняя запись: {firstWork ? firstWork.type_of_work?.name ?? 'Без типа' : 'Нет данных'}</div>
+                  <div>
+                    Последняя запись:{' '}
+                    {firstWork
+                      ? `${firstWork.type_of_work?.name ?? 'Без типа'} · ${firstWork.system?.name ?? firstWork.system_name ?? 'СПЗ'}`
+                      : 'Нет данных'}
+                  </div>
                   <div>Исполнителей: {addressWorksFor(address).length ? new Set(address.works.map((work) => work.technician_id)).size : 0}</div>
                 </div>
               </button>
@@ -283,7 +284,7 @@ export function AddressesWorkspace({
                   <div className="mt-3 text-xs text-zinc-500">
                     Последняя запись:{' '}
                     {lastWork
-                      ? `${lastWork.type_of_work?.name ?? 'Тип работы'} · ${lastWork.technician?.username ?? 'Исполнитель'}`
+                      ? `${lastWork.type_of_work?.name ?? 'Тип работы'} · ${lastWork.technician?.name ?? lastWork.technician?.username ?? 'Исполнитель'}`
                       : 'нет данных'}
                   </div>
                 </div>
@@ -369,7 +370,7 @@ export function AddressesWorkspace({
                         <div>
                           <p className="text-sm font-medium text-white">{work.type_of_work?.name ?? 'Тип работы'}</p>
                           <p className="mt-1 text-xs text-zinc-500">
-                            {work.technician?.username ?? 'Исполнитель'} · {work.technician?.email ?? 'Нет email'}
+                            {work.system?.name ?? work.system_name ?? 'СПЗ'} · {work.technician?.name ?? work.technician?.username ?? 'Исполнитель'} · {work.technician?.email ?? 'Нет email'}
                           </p>
                           <p className="mt-3 text-sm leading-6 text-zinc-300">
                             {work.description ?? 'Без замечаний'}
@@ -399,6 +400,24 @@ export function AddressesWorkspace({
               {canManage && (
                 <form className="mt-6 grid gap-4" onSubmit={handleCreateWork}>
                   <label className="grid gap-2 text-sm text-zinc-300">
+                    <span>Система</span>
+                    <select
+                      className="h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none"
+                      onChange={(event) => setSystemId(event.target.value)}
+                      value={systemId}
+                    >
+                      <option className="bg-zinc-950" value="">
+                        Выберите систему
+                      </option>
+                      {selectedAddress.systems.map((relation) => (
+                        <option key={relation.id} className="bg-zinc-950" value={relation.system_id}>
+                          {relation.system?.name ?? `Система #${relation.system_id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="grid gap-2 text-sm text-zinc-300">
                     <span>Тип работы</span>
                     <select
                       className="h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none"
@@ -426,9 +445,9 @@ export function AddressesWorkspace({
                       <option className="bg-zinc-950" value="">
                         Выберите исполнителя
                       </option>
-                      {techniciansOptions.map((user) => (
+                      {technicians.map((user) => (
                         <option key={user.id} className="bg-zinc-950" value={user.id}>
-                          {user.username} ({user.email})
+                          {user.name ?? user.username} ({user.email})
                         </option>
                       ))}
                     </select>

@@ -3,6 +3,7 @@ import type { WorkRecord } from '../types/domain'
 
 type WorkCreatePayload = {
   address_id: number
+  system_id: number
   type_of_work_id: number
   technician_id: number
   description?: string | null

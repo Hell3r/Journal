@@ -11,6 +11,8 @@ class AddressBase(BaseModel):
 
 class CuratorBase(BaseModel):
     id: int
+    user_id: Optional[int] = None
+    name: Optional[str] = None
     email: Optional[str] = None
     is_active: bool
 

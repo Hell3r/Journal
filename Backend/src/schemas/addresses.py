@@ -35,6 +35,7 @@ class TypeOfWorkShort(BaseModel):
 
 class UserShort(BaseModel):
     id: int
+    name: Optional[str] = None
     email: str
     username: Optional[str] = None
 
@@ -45,8 +46,11 @@ class WorksShort(BaseModel):
     id: int
     description: Optional[str] = None
     address_id: int
+    system_id: Optional[int] = None
     type_of_work_id: int
     technician_id: int
+    system_name: Optional[str] = None
+    system: Optional[SystemShort] = None
     type_of_work: Optional[TypeOfWorkShort] = None
     technician: Optional[UserShort] = None
 
